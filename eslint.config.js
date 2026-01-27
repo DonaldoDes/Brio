@@ -79,6 +79,8 @@ export default [
         Event: 'readonly',
         HTMLInputElement: 'readonly',
         HTMLElement: 'readonly',
+        KeyboardEvent: 'readonly',
+        document: 'readonly',
       },
     },
     rules: {

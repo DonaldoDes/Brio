@@ -5,6 +5,7 @@
 export interface Note {
   id: string
   title: string
+  slug: string
   content: string | null
   created_at: Date
   updated_at: Date

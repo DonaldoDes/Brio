@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, Menu } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -85,6 +85,9 @@ async function createWindow(): Promise<void> {
 }
 
 void app.whenReady().then(async () => {
+  // Disable default menu to allow keyboard shortcuts in renderer
+  Menu.setApplicationMenu(null)
+
   // Initialize PGlite database
   const dbPath = path.join(app.getPath('userData'), 'brio-poc.db')
   db = new PGliteDB(dbPath)

@@ -8,15 +8,15 @@ import { IPC_CHANNELS } from '../../shared/constants/channels'
 
 const api: BrioAPI = {
   notes: {
-    create: (title: string, content: string | null) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTES.CREATE, title, content),
+    create: (title: string, slug: string, content: string | null) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES.CREATE, title, slug, content),
 
     get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.GET, id),
 
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES.GET_ALL),
 
-    update: (id: string, title: string, content: string | null) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE, id, title, content),
+    update: (id: string, title: string, slug: string, content: string | null) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE, id, title, slug, content),
 
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.DELETE, id),
   },

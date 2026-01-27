@@ -19,9 +19,9 @@ export function registerNotesHandlers(db: PGliteDB): void {
   // Create a new note
   ipcMain.handle(
     IPC_CHANNELS.NOTES.CREATE,
-    async (_, title: string, content: string | null): Promise<string> => {
+    async (_, title: string, slug: string, content: string | null): Promise<string> => {
       try {
-        return await db.createNote(title, content)
+        return await db.createNote(title, slug, content)
       } catch (error) {
         console.error('[IPC] notes:create error:', error)
         throw error
@@ -52,9 +52,9 @@ export function registerNotesHandlers(db: PGliteDB): void {
   // Update an existing note
   ipcMain.handle(
     IPC_CHANNELS.NOTES.UPDATE,
-    async (_, id: string, title: string, content: string | null): Promise<void> => {
+    async (_, id: string, title: string, slug: string, content: string | null): Promise<void> => {
       try {
-        await db.updateNote(id, title, content)
+        await db.updateNote(id, title, slug, content)
       } catch (error) {
         console.error('[IPC] notes:update error:', error)
         throw error

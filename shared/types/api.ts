@@ -10,10 +10,10 @@ import type { Note } from './note'
  * Notes API - CRUD operations for notes via IPC
  */
 export interface NotesAPI {
-  create(title: string, content: string | null): Promise<string>
+  create(title: string, slug: string, content: string | null): Promise<string>
   get(id: string): Promise<Note | null>
   getAll(): Promise<Note[]>
-  update(id: string, title: string, content: string | null): Promise<void>
+  update(id: string, title: string, slug: string, content: string | null): Promise<void>
   delete(id: string): Promise<void>
 }
 

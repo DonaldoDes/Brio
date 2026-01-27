@@ -31,7 +31,8 @@ export class PGliteDB {
       CREATE TABLE IF NOT EXISTS notes (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
-        content TEXT,
+        slug TEXT NOT NULL UNIQUE,
+        content TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -45,15 +46,16 @@ export class PGliteDB {
     return await this.db.query(sql, params)
   }
 
-  async createNote(title: string, content: string | null): Promise<string> {
+  async createNote(title: string, slug: string, content: string | null): Promise<string> {
     if (!this.db) {
       throw new Error('Database not initialized')
     }
 
     const id = randomUUID()
-    await this.db.query('INSERT INTO notes (id, title, content) VALUES ($1, $2, $3)', [
+    await this.db.query('INSERT INTO notes (id, title, slug, content) VALUES ($1, $2, $3, $4)', [
       id,
       title,
+      slug,
       content,
     ])
     return id
@@ -82,14 +84,14 @@ export class PGliteDB {
     return result.rows as Note[]
   }
 
-  async updateNote(id: string, title: string, content: string | null): Promise<void> {
+  async updateNote(id: string, title: string, slug: string, content: string | null): Promise<void> {
     if (!this.db) {
       throw new Error('Database not initialized')
     }
 
     const result = await this.db.query(
-      'UPDATE notes SET title = $1, content = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id',
-      [title, content, id]
+      'UPDATE notes SET title = $1, slug = $2, content = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING id',
+      [title, slug, content, id]
     )
 
     if (result.rows.length === 0) {
