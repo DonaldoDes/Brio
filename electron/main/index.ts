@@ -92,7 +92,6 @@ void app.whenReady().then(async () => {
   const dbPath = path.join(app.getPath('userData'), 'brio-poc.db')
   db = new PGliteDB(dbPath)
   await db.initialize()
-  console.log('[Main] PGlite database initialized at:', dbPath)
 
   // Setup IPC handlers
   registerNotesHandlers(db)
@@ -109,7 +108,6 @@ app.on('window-all-closed', () => {
   if (db) {
     void db.close().then(() => {
       db = null
-      console.log('[Main] Database closed')
     })
   }
 
