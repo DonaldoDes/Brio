@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "electron/**/*.ts",
+    "shared/**/*.ts",
+    "tests/**/*.ts",
+    "*.ts",
+    "*.mts",
+    "*.cts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-electron",
+    "out",
+    ".benchmark-db",
+    ".pglite-footprint-test"
+  ]
+}

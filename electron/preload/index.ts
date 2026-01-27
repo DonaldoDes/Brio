@@ -1,21 +1,54 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import type { BrioAPI } from '../../shared/types/api'
+import { IPC_CHANNELS } from '../../shared/constants/channels'
 
-// --------- Expose some API to the Renderer process ---------
+// --------- Expose secure API to the Renderer process ---------
+// This API uses contextBridge to safely expose IPC functionality
+// without giving direct access to Node.js or Electron internals
+
+const api: BrioAPI = {
+  notes: {
+    create: (title: string, content: string | null) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES.CREATE, title, content),
+
+    get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.GET, id),
+
+    getAll: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES.GET_ALL),
+
+    update: (id: string, title: string, content: string | null) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE, id, title, content),
+
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.DELETE, id),
+  },
+}
+
+contextBridge.exposeInMainWorld('api', api)
+
+// --------- Legacy ipcRenderer exposure (for backward compatibility) ---------
+// WARNING: This is less secure than the typed API above
+// Consider removing this once all code uses window.api
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+    ipcRenderer.on(channel, (event, ...args) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      listener(event, ...args)
+    })
+    return ipcRenderer
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
     const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+    ipcRenderer.off(channel, ...omit)
+    return ipcRenderer
   },
   send(...args: Parameters<typeof ipcRenderer.send>) {
     const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    ipcRenderer.send(channel, ...omit)
   },
   invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
     const [channel, ...omit] = args
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return ipcRenderer.invoke(channel, ...omit)
   },
 
@@ -24,7 +57,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 // --------- Preload scripts loading ---------
-function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
+function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']): Promise<boolean> {
   return new Promise((resolve) => {
     if (condition.includes(document.readyState)) {
       resolve(true)
@@ -40,12 +73,12 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
 
 const safeDOM = {
   append(parent: HTMLElement, child: HTMLElement) {
-    if (!Array.from(parent.children).find(e => e === child)) {
+    if (!Array.from(parent.children).find((e) => e === child)) {
       return parent.appendChild(child)
     }
   },
   remove(parent: HTMLElement, child: HTMLElement) {
-    if (Array.from(parent.children).find(e => e === child)) {
+    if (Array.from(parent.children).find((e) => e === child)) {
       return parent.removeChild(child)
     }
   },
@@ -57,7 +90,7 @@ const safeDOM = {
  * https://projects.lukehaas.me/css-loaders
  * https://matejkustec.github.io/SpinThatShit
  */
-function useLoading() {
+function useLoading(): { appendLoading: () => void; removeLoading: () => void } {
   const className = `loaders-css__square-spin`
   const styleContent = `
 @keyframes square-spin {
@@ -109,10 +142,13 @@ function useLoading() {
 // ----------------------------------------------------------------------
 
 const { appendLoading, removeLoading } = useLoading()
-domReady().then(appendLoading)
+void domReady().then(appendLoading)
 
 window.onmessage = (ev) => {
-  ev.data.payload === 'removeLoading' && removeLoading()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  if (ev.data.payload === 'removeLoading') {
+    removeLoading()
+  }
 }
 
 setTimeout(removeLoading, 4999)

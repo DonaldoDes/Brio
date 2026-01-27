@@ -3,8 +3,10 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
+import { PGliteDB } from './database'
+import { registerNotesHandlers, cleanupIPC } from './ipc/handlers/notes'
 
-const require = createRequire(import.meta.url)
+const _require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -39,10 +41,11 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let win: BrowserWindow | null = null
+let db: PGliteDB | null = null
 const preload = path.join(__dirname, '../preload/index.mjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
-async function createWindow() {
+async function createWindow(): Promise<void> {
   win = new BrowserWindow({
     title: 'Main window',
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
@@ -57,12 +60,13 @@ async function createWindow() {
     },
   })
 
-  if (VITE_DEV_SERVER_URL) { // #298
-    win.loadURL(VITE_DEV_SERVER_URL)
+  if (VITE_DEV_SERVER_URL) {
+    // #298
+    await win.loadURL(VITE_DEV_SERVER_URL)
     // Open devTool if the app is not packaged
     win.webContents.openDevTools()
   } else {
-    win.loadFile(indexHtml)
+    await win.loadFile(indexHtml)
   }
 
   // Test actively push message to the Electron-Renderer
@@ -72,16 +76,40 @@ async function createWindow() {
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:')) shell.openExternal(url)
+    if (url.startsWith('https:')) {
+      void shell.openExternal(url)
+    }
     return { action: 'deny' }
   })
   // win.webContents.on('will-navigate', (event, url) => { }) #344
 }
 
-app.whenReady().then(createWindow)
+void app.whenReady().then(async () => {
+  // Initialize PGlite database
+  const dbPath = path.join(app.getPath('userData'), 'brio-poc.db')
+  db = new PGliteDB(dbPath)
+  await db.initialize()
+  console.log('[Main] PGlite database initialized at:', dbPath)
+
+  // Setup IPC handlers
+  registerNotesHandlers(db)
+
+  // Create main window
+  await createWindow()
+})
 
 app.on('window-all-closed', () => {
   win = null
+
+  // Cleanup IPC handlers and close database
+  cleanupIPC()
+  if (db) {
+    void db.close().then(() => {
+      db = null
+      console.log('[Main] Database closed')
+    })
+  }
+
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -98,12 +126,12 @@ app.on('activate', () => {
   if (allWindows.length) {
     allWindows[0].focus()
   } else {
-    createWindow()
+    void createWindow()
   }
 })
 
 // New window example arg: new windows url
-ipcMain.handle('open-win', (_, arg) => {
+ipcMain.handle('open-win', (_, arg: string) => {
   const childWindow = new BrowserWindow({
     webPreferences: {
       preload,
@@ -113,8 +141,8 @@ ipcMain.handle('open-win', (_, arg) => {
   })
 
   if (VITE_DEV_SERVER_URL) {
-    childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`)
+    void childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`)
   } else {
-    childWindow.loadFile(indexHtml, { hash: arg })
+    void childWindow.loadFile(indexHtml, { hash: arg })
   }
 })
