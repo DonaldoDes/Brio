@@ -70,8 +70,10 @@
 
   // Load notes on mount
   onMounted(async () => {
+    console.log('[Layout] EditorLayout mounted, loading notes...')
     try {
       await notesStore.loadNotes()
+      console.log('[Layout] Notes loaded successfully')
     } catch (error) {
       console.error('[Layout] Failed to load notes:', error)
     }

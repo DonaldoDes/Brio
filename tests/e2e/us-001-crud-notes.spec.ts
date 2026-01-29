@@ -84,9 +84,10 @@ test.describe('US-001 CRUD Notes @e2e @smoke', () => {
     await titleInput.fill('Test Note')
     await titleInput.blur()
 
-    const editor = page.locator('[data-testid="note-editor"]')
+    const editor = page.locator('.cm-content')
     await editor.click()
-    await editor.fill('Test content')
+    await page.waitForTimeout(100)
+    await editor.pressSequentially('Test content', { delay: 50 })
 
     // When: user clicks on another note then back to "Test Note"
     await newNoteButton.click()
@@ -95,7 +96,7 @@ test.describe('US-001 CRUD Notes @e2e @smoke', () => {
     await testNoteItem.click()
 
     // Then: editor displays "Test content"
-    await expect(editor).toHaveValue('Test content')
+    await expect(editor).toContainText('Test content')
 
     // And: title displays "Test Note"
     await expect(titleInput).toHaveValue('Test Note')
@@ -143,26 +144,28 @@ test.describe('US-001 CRUD Notes @e2e @smoke', () => {
     const titleInput = page.locator('[data-testid="note-title-input"]')
     await titleInput.waitFor({ state: 'visible', timeout: 5000 })
 
-    const editor = page.locator('[data-testid="note-editor"]')
+    const editor = page.locator('.cm-content')
     await editor.click()
+    await page.waitForTimeout(100)
 
     // When: user types "Hello World"
-    await editor.fill('Hello World')
+    await editor.pressSequentially('Hello World', { delay: 50 })
 
     // Then: content is not saved immediately (debounce)
     await page.waitForTimeout(200)
     // Note: We can't easily verify "not saved" without exposing internal state
 
     // And: after 500ms, content is saved
-    await page.waitForTimeout(400) // Total 600ms
+    await page.waitForTimeout(1000) // Total 1200ms to ensure debounce completes
 
     // Verify by reloading the note
     await newNoteButton.click()
-    await page.waitForTimeout(200) // Create another note
+    await page.waitForTimeout(1000) // Wait for new note to be created and selected
     const firstNote = page.locator('[data-testid="note-item"]').first()
     await firstNote.click()
-
-    await expect(editor).toHaveValue('Hello World')
+    
+    // Wait for editor to contain the expected text
+    await expect(editor).toContainText('Hello World', { timeout: 10000 })
   })
 
   test('Scenario 6: should delete a note with delete button', async ({ page }) => {

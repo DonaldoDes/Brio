@@ -2,6 +2,8 @@ import { ipcRenderer, contextBridge } from 'electron'
 import type { BrioAPI } from '../../shared/types/api'
 import { IPC_CHANNELS } from '../../shared/constants/channels'
 
+console.log('[Preload] Script started')
+
 // --------- Expose secure API to the Renderer process ---------
 // This API uses contextBridge to safely expose IPC functionality
 // without giving direct access to Node.js or Electron internals
@@ -20,9 +22,46 @@ const api: BrioAPI = {
 
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.DELETE, id),
   },
+  links: {
+    create: (
+      fromNoteId: string,
+      toNoteId: string | null,
+      toNoteTitle: string,
+      alias: string | null,
+      positionStart: number,
+      positionEnd: number
+    ) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.LINKS.CREATE,
+        fromNoteId,
+        toNoteId,
+        toNoteTitle,
+        alias,
+        positionStart,
+        positionEnd
+      ),
+
+    getOutgoing: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.LINKS.GET_OUTGOING, noteId),
+
+    getBacklinks: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.LINKS.GET_BACKLINKS, noteId),
+
+    updateOnRename: (oldTitle: string, newTitle: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LINKS.UPDATE_ON_RENAME, oldTitle, newTitle),
+
+    markBroken: (toNoteTitle: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LINKS.MARK_BROKEN, toNoteTitle),
+
+    deleteByNote: (noteId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LINKS.DELETE_BY_NOTE, noteId),
+  },
+  window: {
+    openNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW.OPEN_NOTE, noteId),
+  },
 }
 
+console.log('[Preload] Exposing API to main world')
 contextBridge.exposeInMainWorld('api', api)
+console.log('[Preload] API exposed successfully')
 
 // --------- Legacy ipcRenderer exposure (for backward compatibility) ---------
 // WARNING: This is less secure than the typed API above

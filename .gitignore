@@ -28,3 +28,17 @@ release
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Test data
+.test-data
+
+# Debug files
+debug-*.js
+debug-*.mjs
+test-*.mjs
+test-*.html
+
+# Test results
+test-results/
+playwright-report/
+.last-run.json

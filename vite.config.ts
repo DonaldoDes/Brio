@@ -62,6 +62,10 @@ export default defineConfig(({ command }) => {
         renderer: {},
       }),
     ],
+    // Exclude PGlite from dependency optimization to avoid bundling issues
+    optimizeDeps: {
+      exclude: ['@electric-sql/pglite'],
+    },
     server: process.env.VSCODE_DEBUG && (() => {
       const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL)
       return {

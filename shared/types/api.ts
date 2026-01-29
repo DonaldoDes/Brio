@@ -5,6 +5,7 @@
  */
 
 import type { Note } from './note'
+import type { NoteLink } from './link'
 
 /**
  * Notes API - CRUD operations for notes via IPC
@@ -18,10 +19,38 @@ export interface NotesAPI {
 }
 
 /**
+ * Links API - Operations for wikilinks via IPC
+ */
+export interface LinksAPI {
+  create(
+    fromNoteId: string,
+    toNoteId: string | null,
+    toNoteTitle: string,
+    alias: string | null,
+    positionStart: number,
+    positionEnd: number
+  ): Promise<string>
+  getOutgoing(noteId: string): Promise<NoteLink[]>
+  getBacklinks(noteId: string): Promise<NoteLink[]>
+  updateOnRename(oldTitle: string, newTitle: string): Promise<void>
+  markBroken(toNoteTitle: string): Promise<void>
+  deleteByNote(noteId: string): Promise<void>
+}
+
+/**
+ * Window API - Window management operations via IPC
+ */
+export interface WindowAPI {
+  openNote(noteId: string): Promise<void>
+}
+
+/**
  * Main API exposed to renderer process
  */
 export interface BrioAPI {
   notes: NotesAPI
+  links: LinksAPI
+  window: WindowAPI
 }
 
 /**
