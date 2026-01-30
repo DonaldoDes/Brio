@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onMounted, watch } from 'vue'
+  import { ref, onMounted } from 'vue'
   import EditorLayout from './views/Editor/EditorLayout.vue'
 
   const isReady = ref(false)
@@ -9,7 +9,7 @@
   onMounted(() => {
     console.log('[App] App.vue mounted')
     isReady.value = true
-    
+
     // Poll for notesLoaded state
     const checkNotesLoaded = () => {
       const loaded = (window as any).__brio_notesLoaded
@@ -19,23 +19,19 @@
         notesLoaded.value = true
       }
     }
-    
-    const interval = setInterval(checkNotesLoaded, 100)
-    
+
+    const interval = window.setInterval(checkNotesLoaded, 100)
+
     // Cleanup after 10 seconds
-    setTimeout(() => {
+    window.setTimeout(() => {
       console.log('[App] Timeout reached, clearing interval')
-      clearInterval(interval)
+      window.clearInterval(interval)
     }, 10000)
   })
 </script>
 
 <template>
-  <div 
-    id="app"
-    :data-app-ready="isReady"
-    :data-notes-loaded="notesLoaded"
-  >
+  <div id="app" :data-app-ready="isReady" :data-notes-loaded="notesLoaded">
     <EditorLayout />
   </div>
 </template>
@@ -52,6 +48,7 @@
       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #1a1a1a;
   }
 
   #app {
@@ -59,7 +56,7 @@
     height: 100vh;
     overflow: hidden;
   }
-  
+
   /* Ensure app takes full space */
   #app > * {
     width: 100%;

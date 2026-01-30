@@ -14,9 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Set environment variables for compatibility
 process.env.APP_ROOT = APP_ROOT
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(APP_ROOT, 'public')
-  : RENDERER_DIST
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(APP_ROOT, 'public') : RENDERER_DIST
 
 // Re-export constants for backward compatibility
 export { APP_ROOT, MAIN_DIST, RENDERER_DIST, VITE_DEV_SERVER_URL }
@@ -52,7 +50,8 @@ async function createWindow(): Promise<void> {
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
     width: 1200,
     height: 800,
-    show: true, // Always show window (Playwright needs it visible)
+    show: !isTest, // Hide window in test mode (headless)
+    backgroundColor: '#1a1a1a', // Match dark theme background
     webPreferences: {
       preload,
       // offscreen: isTest, // REMOVED: Causes EXC_BAD_ACCESS crashes on macOS
@@ -96,7 +95,7 @@ async function createWindow(): Promise<void> {
 
 void app.whenReady().then(async () => {
   console.log('[Main] App ready, initializing...')
-  
+
   // Disable default menu to allow keyboard shortcuts in renderer
   Menu.setApplicationMenu(null)
 
