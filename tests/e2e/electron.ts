@@ -13,22 +13,32 @@ export const test = base.extend<{ electronApp: ElectronApplication; page: Page }
   // eslint-disable-next-line no-empty-pattern
   electronApp: async ({}, use) => {
     // Use unique user data dir per test to avoid singleton lock conflicts
-    const userDataDir = path.join(process.cwd(), '.test-data', `test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    
+    const timestamp = Date.now().toString()
+    const random = Math.random().toString(36).slice(2)
+    const userDataDir = path.join(process.cwd(), '.test-data', `test-${timestamp}-${random}`)
+
     const app = await electron.launch({
       executablePath: electronPath,
-      args: [electronMainPath, `--user-data-dir=${userDataDir}`],
+      args: [
+        electronMainPath,
+        `--user-data-dir=${userDataDir}`,
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
+      ],
       env: {
         ...process.env,
         NODE_ENV: 'test',
+        ELECTRON_ENABLE_LOGGING: '0', // Reduce console noise
       },
     })
-    
+
     // Capture Electron main process logs
-    app.process().stdout?.on('data', (data) => {
+    app.process().stdout?.on('data', (data: Buffer) => {
       console.log(`[Electron stdout] ${data.toString()}`)
     })
-    app.process().stderr?.on('data', (data) => {
+    app.process().stderr?.on('data', (data: Buffer) => {
       console.log(`[Electron stderr] ${data.toString()}`)
     })
     await use(app)
@@ -44,7 +54,7 @@ export const test = base.extend<{ electronApp: ElectronApplication; page: Page }
 
     await page.waitForLoadState('domcontentloaded')
     console.log('[Test] DOM content loaded')
-    
+
     // Wait for Vue app to mount and Pinia store to initialize
     try {
       await page.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 })
