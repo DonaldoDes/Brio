@@ -21,6 +21,8 @@ const api: BrioAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE, id, title, slug, content),
 
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.DELETE, id),
+
+    search: (query: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.SEARCH, query),
   },
   links: {
     create: (
@@ -51,8 +53,7 @@ const api: BrioAPI = {
     markBroken: (toNoteTitle: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.LINKS.MARK_BROKEN, toNoteTitle),
 
-    deleteByNote: (noteId: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.LINKS.DELETE_BY_NOTE, noteId),
+    deleteByNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.LINKS.DELETE_BY_NOTE, noteId),
   },
   window: {
     openNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW.OPEN_NOTE, noteId),

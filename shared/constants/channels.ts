@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
     GET_ALL: 'notes:getAll',
     UPDATE: 'notes:update',
     DELETE: 'notes:delete',
+    SEARCH: 'notes:search',
   },
   LINKS: {
     CREATE: 'links:create',

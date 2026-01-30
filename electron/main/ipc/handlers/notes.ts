@@ -72,6 +72,16 @@ export function registerNotesHandlers(db: PGliteDB): void {
     }
   })
 
+  // Search notes
+  ipcMain.handle(IPC_CHANNELS.NOTES.SEARCH, async (_, query: string): Promise<Note[]> => {
+    try {
+      return await db.searchNotes(query)
+    } catch (error) {
+      console.error('[IPC] notes:search error:', error)
+      throw error
+    }
+  })
+
   console.log('[IPC] Notes handlers registered successfully')
 }
 
@@ -84,5 +94,6 @@ export function cleanupIPC(): void {
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.GET_ALL)
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.UPDATE)
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.DELETE)
+  ipcMain.removeHandler(IPC_CHANNELS.NOTES.SEARCH)
   console.log('[IPC] Notes handlers removed')
 }

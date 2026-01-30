@@ -35,7 +35,8 @@ export class PGliteDB {
         slug TEXT NOT NULL UNIQUE,
         content TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMP DEFAULT NULL
       );
 
       CREATE TABLE IF NOT EXISTS note_links (
@@ -52,6 +53,13 @@ export class PGliteDB {
 
       CREATE INDEX IF NOT EXISTS idx_links_from ON note_links(from_note_id);
       CREATE INDEX IF NOT EXISTS idx_links_to ON note_links(to_note_id);
+
+      -- Full-Text Search indexes (case insensitive)
+      CREATE INDEX IF NOT EXISTS idx_notes_title_lower ON notes (lower(title));
+      CREATE INDEX IF NOT EXISTS idx_notes_content_lower ON notes (lower(content));
+      
+      -- Index for filtering deleted notes
+      CREATE INDEX IF NOT EXISTS idx_notes_deleted_at ON notes (deleted_at);
     `)
   }
 
@@ -96,7 +104,9 @@ export class PGliteDB {
       throw new Error('Database not initialized')
     }
 
-    const result = await this.db.query('SELECT * FROM notes ORDER BY created_at ASC')
+    const result = await this.db.query(
+      'SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY created_at ASC'
+    )
     return result.rows as Note[]
   }
 
@@ -120,10 +130,14 @@ export class PGliteDB {
       throw new Error('Database not initialized')
     }
 
-    const result = await this.db.query('DELETE FROM notes WHERE id = $1 RETURNING id', [id])
+    // Soft delete: set deleted_at timestamp instead of physical deletion
+    const result = await this.db.query(
+      'UPDATE notes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING id',
+      [id]
+    )
 
     if (result.rows.length === 0) {
-      throw new Error(`Note with id ${id} not found`)
+      throw new Error(`Note with id ${id} not found or already deleted`)
     }
   }
 
@@ -243,7 +257,7 @@ export class PGliteDB {
     for (const row of notesWithLinks.rows) {
       const noteId = row.from_note_id as string
       const note = await this.getNote(noteId)
-      if (note?.content) {
+      if (note?.content !== null && note?.content !== undefined && note.content.trim() !== '') {
         // Replace [[oldTitle]] and [[oldTitle|alias]] with new title
         const updatedContent = note.content
           .replace(
@@ -254,12 +268,12 @@ export class PGliteDB {
             new RegExp(`\\[\\[${oldTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\|`, 'g'),
             `[[${newTitle}|`
           )
-        
+
         // Update the note content
-        await this.db.query(
-          'UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2',
-          [updatedContent, noteId]
-        )
+        await this.db.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2', [
+          updatedContent,
+          noteId,
+        ])
       }
     }
   }
@@ -280,5 +294,101 @@ export class PGliteDB {
     }
 
     await this.db.query('DELETE FROM note_links WHERE from_note_id = $1', [noteId])
+  }
+
+  // ========== SEARCH OPERATIONS ==========
+
+  /**
+   * Remove accents from a string
+   */
+  private removeAccents(str: string): string {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  }
+
+  /**
+   * Search notes by query (case and accent insensitive)
+   * Returns notes ranked by relevance (title matches > content matches)
+   *
+   * @param query - Search query (supports multiple words)
+   * @returns Array of notes with search preview
+   */
+  async searchNotes(query: string): Promise<Array<Note & { preview?: string }>> {
+    if (!this.db) {
+      throw new Error('Database not initialized')
+    }
+
+    if (!query || query.trim() === '') {
+      // Empty query returns all notes
+      return await this.getAllNotes()
+    }
+
+    // Get all notes and filter in JavaScript for accent-insensitive search
+    const allNotes = await this.getAllNotes()
+    console.log('[DB] searchNotes - allNotes count:', allNotes.length)
+    console.log(
+      '[DB] searchNotes - allNotes titles:',
+      allNotes.map((n) => n.title)
+    )
+
+    // Normalize query: lowercase, remove accents
+    const normalizedQuery = this.removeAccents(query.trim().toLowerCase())
+    const words = normalizedQuery.split(/\s+/)
+    console.log('[DB] searchNotes - normalized query:', normalizedQuery, 'words:', words)
+
+    // Filter and rank notes
+    const results = allNotes
+      .map((note) => {
+        const normalizedTitle = this.removeAccents(note.title.toLowerCase())
+        const normalizedContent = this.removeAccents((note.content ?? '').toLowerCase())
+
+        // Check if all words match in title or content
+        const titleMatches = words.every((word) => normalizedTitle.includes(word))
+        const contentMatches = words.every((word) => normalizedContent.includes(word))
+
+        console.log(
+          '[DB] searchNotes - note:',
+          note.title,
+          'normalizedTitle:',
+          normalizedTitle,
+          'titleMatches:',
+          titleMatches
+        )
+
+        if (!titleMatches && !contentMatches) {
+          return null
+        }
+
+        // Rank: 1 = title match, 2 = content match
+        const rank = titleMatches ? 1 : 2
+
+        // Generate preview from content
+        let preview = ''
+        if (note.content !== null && note.content.trim() !== '') {
+          const firstWordIndex = normalizedContent.indexOf(words[0])
+          if (firstWordIndex !== -1) {
+            const start = Math.max(0, firstWordIndex - 50)
+            const end = Math.min(note.content.length, firstWordIndex + 100)
+            preview =
+              (start > 0 ? '...' : '') +
+              note.content.substring(start, end) +
+              (end < note.content.length ? '...' : '')
+          } else {
+            preview = note.content.substring(0, 150) + (note.content.length > 150 ? '...' : '')
+          }
+        }
+
+        return { ...note, rank, preview }
+      })
+      .filter((note): note is Note & { rank: number; preview: string } => note !== null)
+      .sort((a, b) => {
+        // Sort by rank first, then by created_at (oldest first, consistent with getAllNotes)
+        if (a.rank !== b.rank) {
+          return a.rank - b.rank
+        }
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      })
+
+    // Remove rank from returned objects
+    return results.map(({ rank: _rank, ...note }) => note)
   }
 }

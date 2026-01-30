@@ -16,6 +16,7 @@ export interface NotesAPI {
   getAll(): Promise<Note[]>
   update(id: string, title: string, slug: string, content: string | null): Promise<void>
   delete(id: string): Promise<void>
+  search(query: string): Promise<Array<Note & { preview?: string }>>
 }
 
 /**

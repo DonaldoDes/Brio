@@ -32,6 +32,7 @@
   watch(
     selectedNote,
     async (note, oldNote) => {
+      console.log('[NoteEditor] selectedNote changed from', oldNote?.title, 'to', note?.title)
       // Save content of previous note before switching
       if (oldNote && oldNote.id && localContent.value !== (oldNote.content ?? '')) {
         try {
@@ -44,9 +45,11 @@
       if (note) {
         localTitle.value = note.title
         localContent.value = note.content ?? ''
+        console.log('[NoteEditor] Set localTitle to:', localTitle.value)
       } else {
         localTitle.value = ''
         localContent.value = ''
+        console.log('[NoteEditor] Cleared localTitle')
       }
     },
     { immediate: true }
@@ -54,25 +57,25 @@
 
   // Saving state indicator
   const isSaving = ref(false)
-  
+
   // Expose saving state on window for E2E tests
   watch(isSaving, (saving) => {
-    (window as any).__brio_isSaving = saving
+    ;(window as any).__brio_isSaving = saving
   })
-  
+
   // Auto-save content
-  const { saveNow: saveContentNow } = useAutoSave(selectedNoteId, localContent)
-  
+  useAutoSave(selectedNoteId, localContent)
+
   // Force save both title and content
   const saveNow = async (): Promise<void> => {
     if (!selectedNoteId.value) return
-    
+
     isSaving.value = true
     try {
       console.log('[NoteEditor] Force saving title and content')
       await notesStore.updateNote(selectedNoteId.value, {
         title: localTitle.value,
-        content: localContent.value
+        content: localContent.value,
       })
       console.log('[NoteEditor] Force saved successfully')
     } catch (error) {
@@ -82,24 +85,26 @@
       isSaving.value = false
     }
   }
-  
+
   // Expose saveNow, updateNoteTitlesCache, and store for tests
   // Always expose in development builds (E2E tests run against dev build)
-  interface WindowWithTestAPI extends Window {
+  interface WindowWithTestAPI {
     __brio_saveNow?: () => Promise<void>
     __brio_updateCache?: () => Promise<void>
     __brio_store?: {
+      // eslint-disable-next-line no-unused-vars
       createNote: (title: string) => Promise<string>
+      // eslint-disable-next-line no-unused-vars
       selectNote: (id: string) => void
     }
   }
-  ;(window as WindowWithTestAPI).__brio_saveNow = saveNow
-  ;(window as WindowWithTestAPI).__brio_updateCache = updateNoteTitlesCache
-  ;(window as WindowWithTestAPI).__brio_store = {
+  ;(window as unknown as WindowWithTestAPI).__brio_saveNow = saveNow
+  ;(window as unknown as WindowWithTestAPI).__brio_updateCache = updateNoteTitlesCache
+  ;(window as unknown as WindowWithTestAPI).__brio_store = {
     createNote: notesStore.createNote,
-    selectNote: notesStore.selectNote
+    selectNote: notesStore.selectNote,
   }
-  
+
   // Debug: watch localContent changes
   watch(localContent, (newContent) => {
     console.log('[NoteEditor] localContent changed:', newContent.substring(0, 50))
@@ -109,14 +114,14 @@
   async function handleTitleBlur() {
     if (!selectedNoteId.value || !localTitle.value.trim()) return
 
-    (window as any).__brio_titleSaving = true
+    ;(window as any).__brio_titleSaving = true
     isSaving.value = true
     try {
       await notesStore.updateNote(selectedNoteId.value, { title: localTitle.value })
     } catch (error) {
       console.error('[Editor] Failed to update title:', error)
     } finally {
-      (window as any).__brio_titleSaving = false
+      ;(window as any).__brio_titleSaving = false
       isSaving.value = false
     }
   }
@@ -137,7 +142,11 @@
   // Handle wikilink navigation
   const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 
-  async function handleWikilinkClick(detail: { title: string; metaKey?: boolean; ctrlKey?: boolean }) {
+  async function handleWikilinkClick(detail: {
+    title: string
+    metaKey?: boolean
+    ctrlKey?: boolean
+  }) {
     const { title, metaKey, ctrlKey } = detail
     console.log('[NoteEditor] Handling wikilink click for:', title, { metaKey, ctrlKey })
 
@@ -147,7 +156,7 @@
     // Check if Cmd/Ctrl was pressed (open in new window)
     if (metaKey || ctrlKey) {
       console.log('[NoteEditor] Cmd/Ctrl+Click detected, opening in new window')
-      
+
       if (targetNote) {
         // Open existing note in new window
         console.log('[NoteEditor] Opening existing note in new window:', targetNote.id)
@@ -177,8 +186,8 @@
 </script>
 
 <template>
-  <div 
-    v-if="selectedNote" 
+  <div
+    v-if="selectedNote"
     class="note-editor"
     :data-saving="isSaving"
     :data-note-id="selectedNote.id"
@@ -204,7 +213,11 @@
     </div>
 
     <div class="editor-content">
-      <MarkdownEditor ref="editorRef" v-model="localContent" @wikilink-click="handleWikilinkClick" />
+      <MarkdownEditor
+        ref="editorRef"
+        v-model="localContent"
+        @wikilink-click="handleWikilinkClick"
+      />
     </div>
 
     <BacklinksPanel />

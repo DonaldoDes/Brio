@@ -20,19 +20,23 @@ export const useNotesStore = defineStore('notes', () => {
   const notesLoaded = ref<boolean>(false)
 
   // Initialize window properties immediately for E2E tests
-  ;(window as any).__brio_isLoading = false
-  ;(window as any).__brio_notesLoaded = false
+  interface WindowWithBrio extends Window {
+    __brio_isLoading?: boolean
+    __brio_notesLoaded?: boolean
+  }
+  ;(window as WindowWithBrio).__brio_isLoading = false
+  ;(window as WindowWithBrio).__brio_notesLoaded = false
   console.log('[Store] Initialized window properties')
 
   // Expose loading state on window for E2E tests
   watch(isLoading, (value) => {
     console.log('[Store] isLoading changed to:', value)
-    ;(window as any).__brio_isLoading = value
+    ;(window as WindowWithBrio).__brio_isLoading = value
   })
 
   watch(notesLoaded, (value) => {
     console.log('[Store] notesLoaded changed to:', value)
-    ;(window as any).__brio_notesLoaded = value
+    ;(window as WindowWithBrio).__brio_notesLoaded = value
   })
 
   // Expose as a property for reactivity
@@ -48,14 +52,14 @@ export const useNotesStore = defineStore('notes', () => {
   async function loadNotes(): Promise<void> {
     console.log('[Store] loadNotes called')
     console.log('[Store] window.api available?', typeof window.api !== 'undefined')
-    console.log('[Store] window.api.notes available?', typeof window.api?.notes !== 'undefined')
-    
+    console.log('[Store] window.api.notes available?', typeof window.api !== 'undefined')
+
     // Guard: wait for window.api to be available
     if (typeof window.api === 'undefined') {
       console.error('[Store] window.api is not available! Waiting...')
       // Wait up to 5 seconds for API to be available
       for (let i = 0; i < 50; i++) {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         if (typeof window.api !== 'undefined') {
           console.log('[Store] window.api is now available after', i * 100, 'ms')
           break
@@ -69,7 +73,7 @@ export const useNotesStore = defineStore('notes', () => {
         throw error
       }
     }
-    
+
     isLoading.value = true
     try {
       console.log('[Store] Calling window.api.notes.getAll()')
@@ -81,7 +85,7 @@ export const useNotesStore = defineStore('notes', () => {
         selectedNoteId.value = notes.value[0].id
         console.log('[Store] Auto-selected first note:', selectedNoteId.value)
       }
-      
+
       console.log('[Store] Setting notesLoaded to true')
       notesLoaded.value = true
     } catch (error) {
@@ -138,6 +142,7 @@ export const useNotesStore = defineStore('notes', () => {
         content: '',
         created_at: new Date(),
         updated_at: new Date(),
+        deleted_at: null,
       }
 
       // Add to notes array at the end (oldest first, newest last)
@@ -159,11 +164,13 @@ export const useNotesStore = defineStore('notes', () => {
   /**
    * Parse wikilinks from content
    */
-  function parseWikilinks(content: string): Array<{ title: string; alias: string | null; start: number; end: number }> {
+  function parseWikilinks(
+    content: string
+  ): Array<{ title: string; alias: string | null; start: number; end: number }> {
     const wikilinks: Array<{ title: string; alias: string | null; start: number; end: number }> = []
     // Regex to match [[title]] or [[title|alias]], ignoring escaped \[[
     const regex = /(?<!\\)\[\[([^\]|]+)(\|([^\]]+))?\]\]/g
-    
+
     let match: RegExpExecArray | null
     while ((match = regex.exec(content)) !== null) {
       const title = match[1].trim()
@@ -175,7 +182,7 @@ export const useNotesStore = defineStore('notes', () => {
         end: match.index + match[0].length,
       })
     }
-    
+
     return wikilinks
   }
 
@@ -215,39 +222,38 @@ export const useNotesStore = defineStore('notes', () => {
         console.log(`[Store] updateNote: content changed for note ${id}, updating links`)
         // Delete existing links from this note
         await window.api.links.deleteByNote(id)
-        
+
         // Parse and create new links
         const wikilinks = parseWikilinks(content)
-        console.log(`[Store] updateNote: parsed ${wikilinks.length} wikilinks:`, wikilinks)
+        console.log(`[Store] updateNote: parsed ${String(wikilinks.length)} wikilinks:`, wikilinks)
         const affectedNoteIds = new Set<string>()
-        
+
         for (const link of wikilinks) {
           // Find target note by title
           const targetNote = notes.value.find((n) => n.title === link.title)
           const toNoteId = targetNote ? targetNote.id : null
-          
-          console.log(`[Store] Creating link: ${id} -> ${toNoteId} (${link.title})`)
-          
+
+          console.log(`[Store] Creating link: ${id} -> ${toNoteId ?? 'null'} (${link.title})`)
+
           // Track affected notes for backlinks refresh
-          if (toNoteId) {
+          if (toNoteId !== null && toNoteId.trim() !== '') {
             affectedNoteIds.add(toNoteId)
           }
-          
+
           // Create link
-          await window.api.links.create(
-            id,
-            toNoteId,
-            link.title,
-            link.alias,
-            link.start,
-            link.end
-          )
+          await window.api.links.create(id, toNoteId, link.title, link.alias, link.start, link.end)
         }
-        
+
         console.log(`[Store] updateNote: affected notes:`, Array.from(affectedNoteIds))
         // Refresh backlinks if the currently selected note is affected
-        if (selectedNoteId.value && (affectedNoteIds.has(selectedNoteId.value) || selectedNoteId.value === id)) {
-          console.log(`[Store] updateNote: refreshing backlinks for selected note ${selectedNoteId.value}`)
+        if (
+          selectedNoteId.value !== null &&
+          selectedNoteId.value.trim() !== '' &&
+          (affectedNoteIds.has(selectedNoteId.value) || selectedNoteId.value === id)
+        ) {
+          console.log(
+            `[Store] updateNote: refreshing backlinks for selected note ${selectedNoteId.value}`
+          )
           await fetchBacklinks(selectedNoteId.value)
         }
       }
@@ -264,7 +270,7 @@ export const useNotesStore = defineStore('notes', () => {
         }
         notes.value = [...notes.value.slice(0, index), updatedNote, ...notes.value.slice(index + 1)]
       }
-      
+
       // Update wikilinks cache to reflect changes
       await updateNoteTitlesCache()
     } catch (error) {
@@ -311,7 +317,7 @@ export const useNotesStore = defineStore('notes', () => {
    */
   async function selectNote(id: string | null): Promise<void> {
     selectedNoteId.value = id
-    if (id) {
+    if (id !== null && id.trim() !== '') {
       await fetchBacklinks(id)
     } else {
       backlinks.value = []
@@ -325,7 +331,10 @@ export const useNotesStore = defineStore('notes', () => {
     console.log(`[Store] fetchBacklinks called for note ${noteId}`)
     try {
       backlinks.value = await window.api.links.getBacklinks(noteId)
-      console.log(`[Store] Fetched ${backlinks.value.length} backlinks for note ${noteId}:`, backlinks.value)
+      console.log(
+        `[Store] Fetched ${String(backlinks.value.length)} backlinks for note ${noteId}:`,
+        backlinks.value
+      )
     } catch (error) {
       console.error('[Store] Failed to fetch backlinks:', error)
       backlinks.value = []
