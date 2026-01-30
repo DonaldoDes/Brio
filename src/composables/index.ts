@@ -4,5 +4,6 @@
  * Stateful logic and hooks
  */
 
-// export { useNotes } from './useNotes'
-// export { useEditor } from './useEditor'
+export { useAutoSave } from './useAutoSave'
+export { useResizable } from './useResizable'
+export { useLayoutPersistence } from './useLayoutPersistence'
