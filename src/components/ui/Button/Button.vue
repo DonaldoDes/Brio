@@ -1,13 +1,6 @@
 <script setup lang="ts">
   import { computed } from 'vue'
-
-  export interface ButtonProps {
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
-    size?: 'sm' | 'md' | 'lg'
-    disabled?: boolean
-    loading?: boolean
-    type?: 'button' | 'submit' | 'reset'
-  }
+  import type { ButtonProps } from './types'
 
   const props = withDefaults(defineProps<ButtonProps>(), {
     variant: 'primary',

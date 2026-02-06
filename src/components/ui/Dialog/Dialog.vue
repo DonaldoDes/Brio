@@ -10,12 +10,7 @@
     DialogTrigger,
   } from 'radix-vue'
   import { ref } from 'vue'
-
-  export interface DialogProps {
-    open?: boolean
-    title?: string | null
-    description?: string | null
-  }
+  import type { DialogProps } from './types'
 
   const props = withDefaults(defineProps<DialogProps>(), {
     open: false,

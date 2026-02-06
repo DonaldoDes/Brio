@@ -1,16 +1,6 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue'
-
-  export interface InputProps {
-    modelValue?: string
-    type?: 'text' | 'search'
-    placeholder?: string
-    disabled?: boolean
-    error?: boolean
-    errorMessage?: string
-    icon?: string
-    id?: string
-  }
+  import type { InputProps } from './types'
 
   const props = withDefaults(defineProps<InputProps>(), {
     modelValue: '',
