@@ -82,6 +82,19 @@ export function registerNotesHandlers(db: PGliteDB): void {
     }
   })
 
+  // Update note type
+  ipcMain.handle(
+    IPC_CHANNELS.NOTES.UPDATE_TYPE,
+    async (_, id: string, type: string): Promise<void> => {
+      try {
+        await db.updateNoteType(id, type)
+      } catch (error) {
+        console.error('[IPC] notes:updateType error:', error)
+        throw error
+      }
+    }
+  )
+
   console.log('[IPC] Notes handlers registered successfully')
 }
 
@@ -95,5 +108,6 @@ export function cleanupIPC(): void {
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.UPDATE)
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.DELETE)
   ipcMain.removeHandler(IPC_CHANNELS.NOTES.SEARCH)
+  ipcMain.removeHandler(IPC_CHANNELS.NOTES.UPDATE_TYPE)
   console.log('[IPC] Notes handlers removed')
 }
