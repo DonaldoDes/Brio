@@ -8,17 +8,17 @@ const { backlinks } = storeToRefs(notesStore)
 
 const count = computed(() => backlinks.value.length)
 
-function navigateToNote(noteId: string) {
-  notesStore.selectNote(noteId)
+function navigateToNote(fromNoteId: string) {
+  notesStore.selectNote(fromNoteId)
 }
 </script>
 
 <template>
-  <div data-testid="backlinks-panel" class="backlinks-panel">
+  <div v-if="count > 0" data-testid="backlinks-panel" class="backlinks-panel">
     <div class="backlinks-header">
       <span class="backlinks-title">Backlinks (<span data-testid="backlinks-count">{{ count }}</span>)</span>
     </div>
-    <ul v-if="count > 0" class="backlinks-list">
+    <ul class="backlinks-list">
       <li
         v-for="link in backlinks"
         :key="link.id"
@@ -26,12 +26,9 @@ function navigateToNote(noteId: string) {
         class="backlink-item"
         @click="navigateToNote(link.from_note_id)"
       >
-        {{ link.from_note_title }}
+        <div class="backlink-title">{{ link.from_note_title }}</div>
       </li>
     </ul>
-    <div v-else class="backlinks-empty">
-      <p>No backlinks</p>
-    </div>
   </div>
 </template>
 
@@ -46,7 +43,6 @@ function navigateToNote(noteId: string) {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
@@ -71,10 +67,9 @@ function navigateToNote(noteId: string) {
   background-color: var(--color-bg-hover);
 }
 
-.backlinks-empty {
-  padding: var(--space-md);
-  color: var(--color-text-muted);
+.backlink-title {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
   font-size: var(--font-size-sm);
-  text-align: center;
 }
 </style>
