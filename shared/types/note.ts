@@ -2,11 +2,14 @@
  * Note Domain Model
  */
 
+export type NoteType = 'note' | 'project' | 'person' | 'meeting' | 'daily'
+
 export interface Note {
   id: string
   title: string
   slug: string
   content: string | null
+  type: NoteType
   created_at: Date
   updated_at: Date
   deleted_at: Date | null
