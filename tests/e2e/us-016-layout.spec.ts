@@ -59,6 +59,9 @@ async function dragSeparator(page: Page, separator: Locator, deltaX: number): Pr
 }
 
 test.describe('US-016 Architecture UI 3 Colonnes', () => {
+  // Skip entire suite in web mode (requires Electron app launch)
+  test.skip(process.env.BRIO_MODE === 'web', 'Requires Electron app launch')
+
   let electronApp: ElectronApplication
   let page: Page
 

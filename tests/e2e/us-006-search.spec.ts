@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/strict-boolean-expressions */
-import { test, expect, Page } from './electron'
+import { test, expect, Page } from './helpers/setup'
 
 // Helper function to create notes via API and reload page
 async function createNote(page: Page, title: string, content?: string): Promise<void> {
