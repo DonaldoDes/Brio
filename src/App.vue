@@ -1,14 +1,39 @@
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, onUnmounted } from 'vue'
   import EditorLayout from './views/Editor/EditorLayout.vue'
+  import QuickCaptureModal from './components/QuickCapture/QuickCaptureModal.vue'
+  import { useTheme } from './composables/useTheme'
 
   const isReady = ref(false)
   const notesLoaded = ref(false)
+  const { initialize } = useTheme()
+
+  // Global keyboard handler for Cmd+F
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    // Cmd+F (Mac) or Ctrl+F (Windows/Linux)
+    if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+      event.preventDefault()
+      event.stopPropagation()
+      
+      // Focus the search input
+      const searchInput = document.querySelector('[data-testid="search-input"]') as HTMLInputElement
+      if (searchInput) {
+        searchInput.focus()
+      }
+    }
+  }
 
   // Watch for notes loaded state from window
-  onMounted(() => {
+  onMounted(async () => {
     console.log('[App] App.vue mounted')
+    
+    // Initialize theme system
+    await initialize()
+    
     isReady.value = true
+
+    // Add global keyboard listener
+    window.addEventListener('keydown', handleGlobalKeydown)
 
     // Poll for notesLoaded state
     const checkNotesLoaded = () => {
@@ -28,11 +53,17 @@
       window.clearInterval(interval)
     }, 10000)
   })
+
+  onUnmounted(() => {
+    // Remove global keyboard listener
+    window.removeEventListener('keydown', handleGlobalKeydown)
+  })
 </script>
 
 <template>
   <div id="app" :data-app-ready="isReady" :data-notes-loaded="notesLoaded">
     <EditorLayout />
+    <QuickCaptureModal />
   </div>
 </template>
 

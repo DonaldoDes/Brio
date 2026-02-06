@@ -4,22 +4,57 @@
   import { useWindowSize } from '@vueuse/core'
   import { useNotesStore } from '../../stores/notes'
   import { useSearchStore } from '../../stores/search'
+  import { useTagsStore } from '../../stores/tags'
   import { useResizable } from '../../composables/useResizable'
   import { useLayoutPersistence } from '../../composables/useLayoutPersistence'
   import NoteList from '../../components/NoteList/NoteList.vue'
   import NoteEditor from '../../components/Editor/NoteEditor.vue'
   import DeleteConfirmDialog from '../../components/Editor/DeleteConfirmDialog.vue'
+  import BacklinksPanel from '../../components/Sidebar/BacklinksPanel.vue'
+  import BearSidebar from '../../components/Sidebar/BearSidebar.vue'
+  import ThemeSettings from '../../components/Settings/ThemeSettings.vue'
+  import SettingsModal from '../../components/Settings/SettingsModal.vue'
 
   const notesStore = useNotesStore()
   const { selectedNote } = storeToRefs(notesStore)
 
   const searchStore = useSearchStore()
+  const tagsStore = useTagsStore()
 
   // Ref to NoteList component for search focus
   const noteListRef = ref<InstanceType<typeof NoteList> | null>(null)
 
   // Delete dialog state
   const showDeleteDialog = ref(false)
+  
+  // Settings modal state
+  const showSettingsModal = ref(false)
+  
+  // Mobile sidebar state
+  const mobileSidebarOpen = ref(false)
+  
+  // Backlinks sidebar state (hidden by default)
+  const showBacklinks = ref(false)
+  
+  function toggleMobileSidebar() {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+  }
+  
+  function toggleBacklinks() {
+    showBacklinks.value = !showBacklinks.value
+  }
+  
+  function closeMobileSidebar() {
+    mobileSidebarOpen.value = false
+  }
+  
+  function openSettings() {
+    showSettingsModal.value = true
+  }
+  
+  function closeSettings() {
+    showSettingsModal.value = false
+  }
 
   // Layout persistence
   const {
@@ -184,6 +219,10 @@
     try {
       await notesStore.loadNotes()
       console.log('[Layout] Notes loaded successfully')
+      
+      // Load tags after notes
+      await tagsStore.loadTags()
+      console.log('[Layout] Tags loaded successfully')
     } catch (error) {
       console.error('[Layout] Failed to load notes:', error)
     }
@@ -199,80 +238,50 @@
 
 <template>
   <div class="editor-layout">
-    <!-- Sidebar (Navigation) -->
-    <aside class="navigation" :style="sidebarStyle">
-      <div v-if="!isSidebarCollapsed" class="nav-header" tabindex="0">
-        <h1 class="app-title">Brio</h1>
-      </div>
-      <div v-if="!isSidebarCollapsed" class="nav-content">
-        <p class="nav-placeholder">Tags coming soon...</p>
-      </div>
-
-      <!-- Sidebar resize handle -->
-      <div
-        v-if="!isSidebarCollapsed"
-        class="sidebar-separator"
-        @mousedown="sidebar.startResize"
-        @dblclick="resetSidebarWidth"
-      />
-    </aside>
-
-    <!-- Collapse/Expand button (fixed position, outside sidebar) -->
-    <button
-      class="collapse-sidebar-button"
-      :class="{ collapsed: isSidebarCollapsed }"
-      data-testid="collapse-sidebar-button"
-      :title="isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
-      @click.stop="toggleSidebar"
+    <!-- Mobile hamburger menu -->
+    <button 
+      class="hamburger-menu" 
+      data-testid="hamburger-menu"
+      aria-label="Toggle sidebar"
+      @click="toggleMobileSidebar"
     >
-      <svg
-        v-if="!isSidebarCollapsed"
-        class="chevron-left"
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M10 12L6 8L10 4"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <svg
-        v-else
-        class="chevron-right"
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M6 12L10 8L6 4"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="18" x2="21" y2="18" />
       </svg>
     </button>
+    
+    <!-- BearSidebar (Navigation) -->
+    <BearSidebar
+      :mobile-open="mobileSidebarOpen"
+      @open-settings="openSettings"
+      @navigate="(section) => console.log('Navigate to:', section)"
+      @filter-by-tag="(tag) => tagsStore.toggleTag(tag)"
+      @close-mobile="closeMobileSidebar"
+    />
+    
+    <!-- Settings Modal -->
+    <SettingsModal
+      :is-open="showSettingsModal"
+      @close="closeSettings"
+    />
 
     <!-- Note List -->
     <aside class="note-list-panel" :style="listStyle">
-      <div class="note-list-header" tabindex="0">
+      <!-- Header hidden - toolbar has the icons -->
+      <!-- <div class="note-list-header" tabindex="0">
         <button
           class="new-note-button"
           data-testid="new-note-button"
           title="New Note (Cmd+N)"
+          aria-label="Create new note"
           @click="createNewNote"
         >
           + New Note
         </button>
-      </div>
+        <ThemeSettings />
+      </div> -->
       <NoteList ref="noteListRef" />
 
       <!-- List resize handle -->
@@ -281,7 +290,12 @@
 
     <!-- Editor -->
     <main class="editor-panel" tabindex="0">
-      <NoteEditor @delete-note="openDeleteDialog" />
+      <div class="editor-content">
+        <NoteEditor @delete-note="openDeleteDialog" />
+      </div>
+      <aside v-if="showBacklinks" class="backlinks-sidebar">
+        <BacklinksPanel />
+      </aside>
     </main>
 
     <!-- Delete Confirmation Dialog -->
@@ -301,84 +315,38 @@
     width: 100vw;
     overflow: hidden;
     background-color: var(--color-bg);
-  }
-
-  .navigation {
     position: relative;
-    background-color: var(--color-bg-secondary);
-    border-right: 1px solid var(--color-border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
   }
-
-  .nav-header {
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .app-title {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-accent);
-    margin: 0;
-  }
-
-  .nav-content {
-    flex: 1;
-    padding: var(--space-lg);
-    overflow-y: auto;
-  }
-
-  .nav-placeholder {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    text-align: center;
-  }
-
-  .collapse-sidebar-button {
+  
+  .hamburger-menu {
+    display: none;
     position: fixed;
-    top: 16px;
-    left: 228px; /* 240px - 12px */
-    z-index: 1000;
-    width: 24px;
-    height: 24px;
-    display: flex;
+    top: 12px;
+    left: 12px;
+    z-index: 1001;
+    width: 40px;
+    height: 40px;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
     align-items: center;
     justify-content: center;
-    background-color: white;
-    border: 1px solid var(--color-border);
-    border-radius: 50%;
-    cursor: pointer;
-    transition:
-      left 200ms ease-out,
-      background-color 150ms ease-out;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    pointer-events: auto;
+    color: var(--color-text);
+    transition: all 150ms ease;
+  }
+  
+  .hamburger-menu:hover {
+    background-color: var(--color-bg-tertiary);
+  }
+  
+  @media (max-width: 768px) {
+    .hamburger-menu {
+      display: flex;
+    }
   }
 
-  .collapse-sidebar-button:hover {
-    background-color: var(--color-bg-secondary);
-  }
 
-  .collapse-sidebar-button.collapsed {
-    left: 8px;
-  }
-
-  .sidebar-separator {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 4px;
-    cursor: col-resize;
-    background-color: transparent;
-    transition: background-color 150ms ease-out;
-  }
-
-  .sidebar-separator:hover {
-    background-color: var(--color-accent);
-  }
 
   .note-list-panel {
     position: relative;
@@ -392,23 +360,27 @@
   .note-list-header {
     padding: var(--space-md);
     border-bottom: 1px solid var(--color-border);
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
   }
 
   .new-note-button {
-    width: 100%;
+    flex: 1;
     padding: var(--space-sm) var(--space-md);
-    background-color: var(--color-accent);
-    color: white;
+    background-color: transparent;
+    color: var(--color-text-secondary);
     border: none;
     border-radius: 6px;
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
   }
 
   .new-note-button:hover {
-    background-color: var(--color-accent-hover);
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text);
   }
 
   .new-note-button:active {
@@ -433,5 +405,18 @@
   .editor-panel {
     flex: 1;
     overflow: hidden;
+    display: flex;
+  }
+
+  .editor-content {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .backlinks-sidebar {
+    width: 280px;
+    border-left: 1px solid var(--color-border);
+    background-color: var(--color-bg);
+    overflow-y: auto;
   }
 </style>
