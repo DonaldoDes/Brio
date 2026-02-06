@@ -27,20 +27,15 @@ export const useSearchStore = defineStore('search', () => {
 
   // Debounced search function
   const performSearch = async (searchQuery: string): Promise<void> => {
-    console.log('[SearchStore] performSearch called with query:', searchQuery)
     if (!searchQuery.trim()) {
-      console.log('[SearchStore] Empty query, clearing results')
       results.value = []
       return
     }
     isSearching.value = true
     try {
-      console.log('[SearchStore] Calling window.api.notes.search...')
       const searchResults = await window.api.notes.search(searchQuery)
-      console.log('[SearchStore] Received results:', searchResults.length, searchResults)
       results.value = searchResults
       selectedIndex.value = -1
-      console.log('[SearchStore] Results set, results.value:', results.value)
     } finally {
       isSearching.value = false
     }

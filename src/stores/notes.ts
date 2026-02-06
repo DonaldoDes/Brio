@@ -6,10 +6,11 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, nextTick, watch } from 'vue'
-import type { Note } from '../../shared/types/note'
+import type { Note, NoteType } from '../../shared/types/note'
 import type { NoteLink } from '../../shared/types/link'
 import { generateSlug } from '../../shared/utils/slug'
 import { updateNoteTitlesCache } from '../components/Editor/extensions/wikilinks'
+import { useTagsStore } from './tags'
 
 export const useNotesStore = defineStore('notes', () => {
   // State
@@ -26,16 +27,13 @@ export const useNotesStore = defineStore('notes', () => {
   }
   ;(window as WindowWithBrio).__brio_isLoading = false
   ;(window as WindowWithBrio).__brio_notesLoaded = false
-  console.log('[Store] Initialized window properties')
 
   // Expose loading state on window for E2E tests
   watch(isLoading, (value) => {
-    console.log('[Store] isLoading changed to:', value)
     ;(window as WindowWithBrio).__brio_isLoading = value
   })
 
   watch(notesLoaded, (value) => {
-    console.log('[Store] notesLoaded changed to:', value)
     ;(window as WindowWithBrio).__brio_notesLoaded = value
   })
 
@@ -50,10 +48,6 @@ export const useNotesStore = defineStore('notes', () => {
    * Load all notes from database
    */
   async function loadNotes(): Promise<void> {
-    console.log('[Store] loadNotes called')
-    console.log('[Store] window.api available?', typeof window.api !== 'undefined')
-    console.log('[Store] window.api.notes available?', typeof window.api !== 'undefined')
-
     // Guard: wait for window.api to be available
     if (typeof window.api === 'undefined') {
       console.error('[Store] window.api is not available! Waiting...')
@@ -61,7 +55,6 @@ export const useNotesStore = defineStore('notes', () => {
       for (let i = 0; i < 50; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100))
         if (typeof window.api !== 'undefined') {
-          console.log('[Store] window.api is now available after', i * 100, 'ms')
           break
         }
       }
@@ -76,17 +69,13 @@ export const useNotesStore = defineStore('notes', () => {
 
     isLoading.value = true
     try {
-      console.log('[Store] Calling window.api.notes.getAll()')
       notes.value = await window.api.notes.getAll()
-      console.log('[Store] Received notes:', notes.value.length)
 
       // Auto-select first note if none selected
       if (notes.value.length > 0 && selectedNoteId.value === null) {
         selectedNoteId.value = notes.value[0].id
-        console.log('[Store] Auto-selected first note:', selectedNoteId.value)
       }
 
-      console.log('[Store] Setting notesLoaded to true')
       notesLoaded.value = true
     } catch (error) {
       console.error('[Store] Failed to load notes:', error)
@@ -140,6 +129,7 @@ export const useNotesStore = defineStore('notes', () => {
         title: finalTitle,
         slug,
         content: '',
+        type: 'note',
         created_at: new Date(),
         updated_at: new Date(),
         deleted_at: null,
@@ -153,6 +143,10 @@ export const useNotesStore = defineStore('notes', () => {
 
       // THEN select the new note (computed will update automatically)
       selectedNoteId.value = id
+
+      // Reload tags after note creation
+      const tagsStore = useTagsStore()
+      await tagsStore.loadTags()
 
       return id
     } catch (error) {
@@ -206,7 +200,10 @@ export const useNotesStore = defineStore('notes', () => {
       const content = data.content ?? note.content ?? ''
       const slug = data.title !== undefined ? generateSlug(data.title) : note.slug
 
-      // If title changed, update wikilinks
+      // Update the database first
+      await window.api.notes.update(id, title, slug, content)
+
+      // If title changed, update wikilinks in other notes
       if (data.title !== undefined && data.title !== note.title) {
         await window.api.links.updateOnRename(note.title, data.title)
         // Reload all notes to reflect updated wikilinks in content
@@ -215,25 +212,19 @@ export const useNotesStore = defineStore('notes', () => {
         return
       }
 
-      await window.api.notes.update(id, title, slug, content)
-
       // If content changed, update links
       if (data.content !== undefined) {
-        console.log(`[Store] updateNote: content changed for note ${id}, updating links`)
         // Delete existing links from this note
         await window.api.links.deleteByNote(id)
 
         // Parse and create new links
         const wikilinks = parseWikilinks(content)
-        console.log(`[Store] updateNote: parsed ${String(wikilinks.length)} wikilinks:`, wikilinks)
         const affectedNoteIds = new Set<string>()
 
         for (const link of wikilinks) {
           // Find target note by title
           const targetNote = notes.value.find((n) => n.title === link.title)
           const toNoteId = targetNote ? targetNote.id : null
-
-          console.log(`[Store] Creating link: ${id} -> ${toNoteId ?? 'null'} (${link.title})`)
 
           // Track affected notes for backlinks refresh
           if (toNoteId !== null && toNoteId.trim() !== '') {
@@ -244,16 +235,12 @@ export const useNotesStore = defineStore('notes', () => {
           await window.api.links.create(id, toNoteId, link.title, link.alias, link.start, link.end)
         }
 
-        console.log(`[Store] updateNote: affected notes:`, Array.from(affectedNoteIds))
         // Refresh backlinks if the currently selected note is affected
         if (
           selectedNoteId.value !== null &&
           selectedNoteId.value.trim() !== '' &&
           (affectedNoteIds.has(selectedNoteId.value) || selectedNoteId.value === id)
         ) {
-          console.log(
-            `[Store] updateNote: refreshing backlinks for selected note ${selectedNoteId.value}`
-          )
           await fetchBacklinks(selectedNoteId.value)
         }
       }
@@ -273,6 +260,10 @@ export const useNotesStore = defineStore('notes', () => {
 
       // Update wikilinks cache to reflect changes
       await updateNoteTitlesCache()
+
+      // Reload tags after content update
+      const tagsStore = useTagsStore()
+      await tagsStore.loadTags()
     } catch (error) {
       console.error('[Store] Failed to update note:', error)
       throw error
@@ -328,16 +319,46 @@ export const useNotesStore = defineStore('notes', () => {
    * Fetch backlinks for a note
    */
   async function fetchBacklinks(noteId: string): Promise<void> {
-    console.log(`[Store] fetchBacklinks called for note ${noteId}`)
     try {
       backlinks.value = await window.api.links.getBacklinks(noteId)
-      console.log(
-        `[Store] Fetched ${String(backlinks.value.length)} backlinks for note ${noteId}:`,
-        backlinks.value
-      )
     } catch (error) {
       console.error('[Store] Failed to fetch backlinks:', error)
       backlinks.value = []
+    }
+  }
+
+  /**
+   * Update a note's type
+   *
+   * @param id - Note ID
+   * @param type - New note type
+   */
+  async function updateNoteType(id: string, type: NoteType): Promise<void> {
+    try {
+      const note = notes.value.find((n) => n.id === id)
+      if (!note) {
+        throw new Error(`Note ${id} not found`)
+      }
+
+      // Update the database
+      await window.api.notes.updateType(id, type)
+
+      // Update local state - create new array to trigger reactivity
+      const index = notes.value.findIndex((n) => n.id === id)
+      if (index !== -1) {
+        const updatedNote: Note = {
+          ...note,
+          type,
+          updated_at: new Date(),
+        }
+        notes.value = [...notes.value.slice(0, index), updatedNote, ...notes.value.slice(index + 1)]
+      }
+
+      // Wait for Vue to process the update
+      await nextTick()
+    } catch (error) {
+      console.error('[Store] Failed to update note type:', error)
+      throw error
     }
   }
 
@@ -357,5 +378,6 @@ export const useNotesStore = defineStore('notes', () => {
     deleteNote,
     selectNote,
     fetchBacklinks,
+    updateNoteType,
   }
 })

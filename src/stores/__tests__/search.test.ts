@@ -29,7 +29,7 @@ describe('useSearchStore', () => {
 
       expect(store.query).toBe('')
       expect(store.results).toEqual([])
-      expect(store.selectedIndex).toBe(0)
+      expect(store.selectedIndex).toBe(-1)
       expect(store.isSearching).toBe(false)
     })
 
@@ -72,7 +72,7 @@ describe('useSearchStore', () => {
 
       expect(window.api.notes.search).toHaveBeenCalledWith('test query')
       expect(store.results).toEqual(mockResults)
-      expect(store.selectedIndex).toBe(0)
+      expect(store.selectedIndex).toBe(-1)
     })
 
     it('should clear results when query is empty', async () => {
@@ -236,7 +236,7 @@ describe('useSearchStore', () => {
 
       expect(store.query).toBe('')
       expect(store.results).toEqual([])
-      expect(store.selectedIndex).toBe(0)
+      expect(store.selectedIndex).toBe(-1)
     })
   })
 
