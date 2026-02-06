@@ -1,4 +1,4 @@
-import { test, expect } from './electron'
+import { test, expect } from './helpers/setup'
 
 test('Simple test', async ({ page }) => {
   await page.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 })

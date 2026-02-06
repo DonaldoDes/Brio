@@ -1,4 +1,4 @@
-import { test, expect } from './electron'
+import { test, expect } from './helpers/setup'
 
 test.describe('Bear Mode Debug @e2e', () => {
   test.beforeEach(async ({ page }) => {

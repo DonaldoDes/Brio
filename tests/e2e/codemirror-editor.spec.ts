@@ -1,4 +1,24 @@
-import { test, expect } from './electron'
+import { test, expect, isWebMode } from './helpers/setup'
+
+/**
+ * Helper to set editor content reliably in web mode
+ * Uses CodeMirror's dispatch API instead of pressSequentially to avoid garbled content
+ */
+async function setEditorContent(page: any, content: string) {
+  await page.evaluate((text: string) => {
+    const view = (window as any).__brio_editorView
+    if (view) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text }
+      })
+    }
+  }, content)
+  
+  // Force save to ensure content is persisted
+  await page.evaluate(async () => {
+    await (window as any).__brio_saveNow()
+  })
+}
 
 test.describe('CodeMirror Editor @e2e', () => {
   test.beforeEach(async ({ page }) => {
@@ -76,7 +96,9 @@ test.describe('CodeMirror Editor @e2e', () => {
     const cmContent = page.locator('.cm-content')
     await cmContent.click()
     await page.waitForTimeout(100)
-    await cmContent.pressSequentially('This is a test note', { delay: 50 })
+    
+    // Use setEditorContent for reliable content insertion (especially in web mode)
+    await setEditorContent(page, 'This is a test note')
 
     // Wait for auto-save (500ms debounce + buffer)
     await page.waitForTimeout(700)

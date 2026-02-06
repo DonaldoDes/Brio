@@ -1,4 +1,4 @@
-import { test, expect } from './electron'
+import { test, expect } from './helpers/setup'
 
 test.describe('Bear Mode Extension @e2e', () => {
   test.beforeEach(async ({ page }) => {
@@ -145,16 +145,20 @@ test.describe('Bear Mode Extension @e2e', () => {
     // When: cursor is on another line
     await page.waitForTimeout(100)
 
-    // Then: # marker should NOT be visible and text styled as H1
+    // Then: # marker should be muted (visible but grayed) and text styled as H1
     const firstLine = page.locator('.cm-line').first()
     const lineText = await firstLine.textContent()
-    // The # and space should be removed from DOM
-    expect(lineText).toBe('Main Title')
-    expect(lineText).not.toContain('#')
+    // The # marker is now muted (not removed) for WYSIWYG rendering
+    expect(lineText).toContain('#')
+    expect(lineText).toContain('Main Title')
 
     const headingText = page.locator('.cm-bear-heading-1')
     await expect(headingText).toBeVisible()
     await expect(headingText).toContainText('Main Title')
+    
+    // Verify the marker is muted
+    const headerMark = page.locator('.cm-bear-heading-mark')
+    await expect(headerMark).toBeVisible()
   })
 
   test('should handle link syntax', async ({ page }) => {

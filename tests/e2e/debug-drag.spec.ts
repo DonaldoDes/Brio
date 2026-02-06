@@ -3,7 +3,9 @@ import { test, expect, Page } from '@playwright/test'
 import { _electron as electron } from 'playwright'
 import path from 'path'
 
+// Skip entire suite in web mode (requires Electron app launch)
 test.describe('Debug Drag', () => {
+  test.skip(process.env.BRIO_MODE === 'web', 'Requires Electron app launch')
   let electronApp: any
   let page: Page
 

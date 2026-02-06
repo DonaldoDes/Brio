@@ -8,6 +8,8 @@ import electronPath from 'electron'
 const electronMainPath = path.join(process.cwd(), 'dist-electron', 'main', 'index.js')
 
 test('Diagnostic RAW: Check app state without waiting', async () => {
+  // Skip in web mode (requires Electron app launch)
+  test.skip(process.env.BRIO_MODE === 'web', 'Requires Electron app launch')
   console.log('[Diagnostic] Starting raw diagnostic test')
   
   // Launch Electron without any waiting

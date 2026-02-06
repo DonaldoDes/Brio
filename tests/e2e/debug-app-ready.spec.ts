@@ -1,4 +1,4 @@
-import { test, expect } from './electron'
+import { test, expect } from './helpers/setup'
 
 test('Debug: Check app initialization', async ({ page }) => {
   console.log('=== Test started ===')

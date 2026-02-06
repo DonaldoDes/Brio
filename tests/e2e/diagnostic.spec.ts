@@ -1,4 +1,4 @@
-import { test } from './electron'
+import { test } from './helpers/setup'
 
 test('Diagnostic: Check app state', async ({ page }) => {
   test.setTimeout(10000) // 10 seconds max
