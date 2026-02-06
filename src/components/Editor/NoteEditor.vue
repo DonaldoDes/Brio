@@ -1,11 +1,14 @@
 <script setup lang="ts">
-  import { ref, watch } from 'vue'
+  import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
   import { storeToRefs } from 'pinia'
   import { useNotesStore } from '../../stores/notes'
   import { useAutoSave } from '../../composables/useAutoSave'
   import MarkdownEditor from './MarkdownEditor.vue'
-  import BacklinksPanel from '../Sidebar/BacklinksPanel.vue'
+  import NoteTypeSelector from './NoteTypeSelector.vue'
+  import AaFormatButton from './AaFormatButton.vue'
+  import FloatingToolbar from './FloatingToolbar.vue'
   import { updateNoteTitlesCache } from './extensions/wikilinks'
+  import type { NoteType } from '../../../shared/types/note'
 
   const emit = defineEmits<{
     deleteNote: []
@@ -27,12 +30,26 @@
   // Local state for editing
   const localTitle = ref('')
   const localContent = ref('')
+  const localType = ref<NoteType>('note')
+
+  // Track previous note ID to detect actual note switches
+  const previousNoteId = ref<string | null>(null)
+
+  // Auto-save content and get isSaving flag + saveNow function
+  const { isSaving, saveNow: autoSaveNow } = useAutoSave(selectedNoteId, localContent)
+
+  // Expose saving state on window for E2E tests
+  watch(isSaving, (saving) => {
+    ;(window as any).__brio_isSaving = saving
+  })
 
   // Sync local state with selected note
   watch(
     selectedNote,
     async (note, oldNote) => {
-      console.log('[NoteEditor] selectedNote changed from', oldNote?.title, 'to', note?.title)
+      // Detect if we're switching to a different note (ID changed)
+      const noteIdChanged = note?.id !== previousNoteId.value
+
       // Save content of previous note before switching
       if (oldNote && oldNote.id && localContent.value !== (oldNote.content ?? '')) {
         try {
@@ -43,28 +60,26 @@
       }
 
       if (note) {
-        localTitle.value = note.title
-        localContent.value = note.content ?? ''
-        console.log('[NoteEditor] Set localTitle to:', localTitle.value)
+        // Only reset content if:
+        // 1. Switching to a different note (noteIdChanged)
+        // 2. OR content changed externally while NOT auto-saving
+        const contentChanged = !noteIdChanged && !isSaving.value && note.content !== localContent.value
+        
+        if (noteIdChanged || contentChanged) {
+          localTitle.value = note.title
+          localContent.value = note.content ?? ''
+          localType.value = note.type || 'note'
+          previousNoteId.value = note.id
+        }
       } else {
         localTitle.value = ''
         localContent.value = ''
-        console.log('[NoteEditor] Cleared localTitle')
+        localType.value = 'note'
+        previousNoteId.value = null
       }
     },
     { immediate: true }
   )
-
-  // Saving state indicator
-  const isSaving = ref(false)
-
-  // Expose saving state on window for E2E tests
-  watch(isSaving, (saving) => {
-    ;(window as any).__brio_isSaving = saving
-  })
-
-  // Auto-save content
-  useAutoSave(selectedNoteId, localContent)
 
   // Force save both title and content
   const saveNow = async (): Promise<void> => {
@@ -72,12 +87,12 @@
 
     isSaving.value = true
     try {
-      console.log('[NoteEditor] Force saving title and content')
+      // Save title first
       await notesStore.updateNote(selectedNoteId.value, {
         title: localTitle.value,
-        content: localContent.value,
       })
-      console.log('[NoteEditor] Force saved successfully')
+      // Then use autoSave's saveNow for content (handles isSaving + nextTick correctly)
+      await autoSaveNow()
     } catch (error) {
       console.error('[NoteEditor] Failed to force save:', error)
       throw error
@@ -96,6 +111,7 @@
       createNote: (title: string) => Promise<string>
       // eslint-disable-next-line no-unused-vars
       selectNote: (id: string) => void
+      loadNotes: () => Promise<void>
     }
   }
   ;(window as unknown as WindowWithTestAPI).__brio_saveNow = saveNow
@@ -103,12 +119,8 @@
   ;(window as unknown as WindowWithTestAPI).__brio_store = {
     createNote: notesStore.createNote,
     selectNote: notesStore.selectNote,
+    loadNotes: notesStore.loadNotes,
   }
-
-  // Debug: watch localContent changes
-  watch(localContent, (newContent) => {
-    console.log('[NoteEditor] localContent changed:', newContent.substring(0, 50))
-  })
 
   // Handle title blur (save title)
   async function handleTitleBlur() {
@@ -118,10 +130,27 @@
     isSaving.value = true
     try {
       await notesStore.updateNote(selectedNoteId.value, { title: localTitle.value })
+      await nextTick() // Ensure watchers see isSaving=true
     } catch (error) {
       console.error('[Editor] Failed to update title:', error)
     } finally {
       ;(window as any).__brio_titleSaving = false
+      isSaving.value = false
+    }
+  }
+
+  // Handle type change
+  async function handleTypeChange(newType: NoteType) {
+    if (!selectedNoteId.value) return
+
+    isSaving.value = true
+    try {
+      await notesStore.updateNoteType(selectedNoteId.value, newType)
+      await nextTick() // Ensure watchers see isSaving=true
+      localType.value = newType
+    } catch (error) {
+      console.error('[Editor] Failed to update type:', error)
+    } finally {
       isSaving.value = false
     }
   }
@@ -148,41 +177,63 @@
     ctrlKey?: boolean
   }) {
     const { title, metaKey, ctrlKey } = detail
-    console.log('[NoteEditor] Handling wikilink click for:', title, { metaKey, ctrlKey })
 
     // Find note by title
     const targetNote = notesStore.notes.find((n) => n.title === title)
 
     // Check if Cmd/Ctrl was pressed (open in new window)
     if (metaKey || ctrlKey) {
-      console.log('[NoteEditor] Cmd/Ctrl+Click detected, opening in new window')
-
       if (targetNote) {
         // Open existing note in new window
-        console.log('[NoteEditor] Opening existing note in new window:', targetNote.id)
         await window.api.window.openNote(targetNote.id)
       } else {
         // Create new note and open in new window
-        console.log('[NoteEditor] Creating new note and opening in new window:', title)
         const newNoteId = await notesStore.createNote(title)
         await window.api.window.openNote(newNoteId)
-        console.log('[NoteEditor] New note created and opened:', newNoteId)
       }
       return
     }
 
     if (targetNote) {
       // Navigate to existing note
-      console.log('[NoteEditor] Navigating to existing note:', targetNote.id)
       notesStore.selectNote(targetNote.id)
     } else {
       // Create new note with the title
-      console.log('[NoteEditor] Creating new note:', title)
       const newNoteId = await notesStore.createNote(title)
       notesStore.selectNote(newNoteId)
-      console.log('[NoteEditor] New note created:', newNoteId)
     }
   }
+
+  // Floating toolbar state
+  const isToolbarOpen = ref(false)
+
+  function toggleToolbar() {
+    isToolbarOpen.value = !isToolbarOpen.value
+  }
+
+  function handleFormat(type: string) {
+    // Apply formatting to editor
+    if (!editorRef.value) return
+    
+    // TODO: Implement formatting logic via CodeMirror
+    console.log('[NoteEditor] Format:', type)
+  }
+
+  // Keyboard shortcut for toggling toolbar (Cmd+Shift+F)
+  function handleKeyDown(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'F') {
+      event.preventDefault()
+      toggleToolbar()
+    }
+  }
+
+  onMounted(() => {
+    window.addEventListener('keydown', handleKeyDown)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeyDown)
+  })
 </script>
 
 <template>
@@ -192,35 +243,46 @@
     :data-saving="isSaving"
     :data-note-id="selectedNote.id"
   >
-    <div class="editor-header">
+    <!-- Bear-style editor layout -->
+    <div class="editor-content-area">
+      <!-- Aa button (positioned absolute top-right) -->
+      <AaFormatButton :open="isToolbarOpen" @toggle="toggleToolbar" />
+
+      <!-- Scrollable content -->
       <input
+        id="note-title-input"
         ref="titleInputRef"
         v-model="localTitle"
         data-testid="note-title-input"
         type="text"
+        name="note-title"
         class="note-title-input"
         placeholder="Untitled"
         @blur="handleTitleBlur"
       />
-      <button
-        data-testid="delete-note-button"
-        class="delete-note-button"
-        title="Delete Note (Cmd+Backspace)"
-        @click="emit('deleteNote')"
-      >
-        🗑️
-      </button>
-    </div>
+      
+      <!-- Type selector and delete button - HIDDEN -->
+      <!-- <div class="editor-toolbar-row">
+        <NoteTypeSelector v-model="localType" @update:model-value="handleTypeChange" />
+        <button
+          data-testid="delete-note-button"
+          class="delete-note-button"
+          title="Delete Note (Cmd+Backspace)"
+          @click="emit('deleteNote')"
+        >
+          🗑️
+        </button>
+      </div> -->
 
-    <div class="editor-content">
       <MarkdownEditor
         ref="editorRef"
         v-model="localContent"
         @wikilink-click="handleWikilinkClick"
       />
-    </div>
 
-    <BacklinksPanel />
+      <!-- Floating toolbar -->
+      <FloatingToolbar :open="isToolbarOpen" @format="handleFormat" />
+    </div>
   </div>
 
   <div v-else class="empty-editor">
@@ -236,49 +298,58 @@
     background-color: var(--color-bg);
   }
 
-  .editor-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    border-bottom: 1px solid var(--color-border);
-    padding-right: var(--space-md);
-    flex-shrink: 0;
-  }
-
-  .editor-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+  /* Bear-style editor layout */
+  .editor-content-area {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    max-width: none; /* Fluid width */
+    padding-top: 36px; /* 36px top for alignment with note list */
+    padding-left: 48px; /* 48px horizontal padding */
+    padding-right: 48px; /* 48px horizontal padding */
+    padding-bottom: 120px; /* 120px bottom for toolbar clearance */
   }
 
   .note-title-input {
-    flex: 1;
-    padding: var(--space-lg);
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text);
-    background-color: transparent;
+    width: 100%;
+    padding: 0;
+    margin-bottom: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: #1A1A1A;
+    background: none;
     border: none;
     outline: none;
   }
 
+  :root[data-theme="dark"] .note-title-input {
+    color: #E5E5E7;
+  }
+
+  .note-title-input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .editor-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
   .delete-note-button {
-    padding: var(--space-sm);
+    padding: 8px;
     background-color: transparent;
     border: none;
     cursor: pointer;
-    font-size: var(--font-size-lg);
+    font-size: 16px;
     opacity: 0.6;
     transition: opacity 0.2s;
   }
 
   .delete-note-button:hover {
     opacity: 1;
-  }
-
-  .note-title-input::placeholder {
-    color: var(--color-text-muted);
   }
 
   .empty-editor {

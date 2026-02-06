@@ -8,7 +8,9 @@
   import { markdownKeymap } from './extensions/markdownKeymap'
   import { listContinuation } from './extensions/listContinuation'
   import { wikilinks, updateNoteTitlesCache } from './extensions/wikilinks'
+  import { taskCheckbox } from './extensions/taskCheckbox'
   import WikilinkAutocomplete from './WikilinkAutocomplete.vue'
+  import TagAutocomplete from './TagAutocomplete.vue'
   import { useNotesStore } from '../../stores/notes'
   import { storeToRefs } from 'pinia'
 
@@ -24,18 +26,26 @@
   const editorContainer = ref<HTMLDivElement | null>(null)
   let editorView: EditorView | null = null
 
-  // Autocomplete state
+  // Wikilink autocomplete state
   const autocompleteOpen = ref(false)
   const autocompleteQuery = ref('')
   const autocompletePosition = ref({ x: 0, y: 0 })
   const autocompleteSelectedIndex = ref(-1)
   let autocompleteStartPos = 0
 
+  // Tag autocomplete state
+  const tagAutocompleteOpen = ref(false)
+  const tagAutocompleteQuery = ref('')
+  const tagAutocompletePosition = ref({ x: 0, y: 0 })
+  const tagAutocompleteSelectedIndex = ref(-1)
+  let tagAutocompleteStartPos = 0
+  const availableTags = ref<string[]>([])
+
   // Get notes from store for autocomplete
   const notesStore = useNotesStore()
   const { notes } = storeToRefs(notesStore)
 
-  // Filtered notes for autocomplete (same logic as WikilinkAutocomplete)
+  // Filtered notes for wikilink autocomplete
   const autocompleteSuggestions = computed(() => {
     if (!autocompleteQuery.value) {
       return notes.value.slice(0, 8)
@@ -43,6 +53,17 @@
     const q = autocompleteQuery.value.toLowerCase()
     return notes.value
       .filter((n) => n.title.toLowerCase().includes(q))
+      .slice(0, 8)
+  })
+
+  // Filtered tags for tag autocomplete
+  const tagAutocompleteSuggestions = computed(() => {
+    if (!tagAutocompleteQuery.value) {
+      return availableTags.value.slice(0, 8)
+    }
+    const q = tagAutocompleteQuery.value.toLowerCase()
+    return availableTags.value
+      .filter((t) => t.toLowerCase().includes(q))
       .slice(0, 8)
   })
 
@@ -100,8 +121,104 @@
     return false
   }
 
+  // Detect tag autocomplete trigger
+  async function detectTagTrigger(view: EditorView): Promise<boolean> {
+    const { state } = view
+    const pos = state.selection.main.head
+    const text = state.doc.toString()
+    
+    // Check if we just typed #
+    if (pos >= 1 && text[pos - 1] === '#') {
+      // Make sure # is not part of a word (check character before #)
+      const charBefore = pos >= 2 ? text[pos - 2] : ' '
+      if (/\s/.test(charBefore) || charBefore === '\n' || pos === 1) {
+        // Refresh tags before showing autocomplete
+        await fetchAvailableTags()
+        
+        console.log('[TagAutocomplete] Detected # at pos:', pos, 'charBefore:', charBefore, 'availableTags:', availableTags.value.length)
+        
+        tagAutocompleteStartPos = pos
+        tagAutocompleteQuery.value = ''
+        tagAutocompleteSelectedIndex.value = -1
+        
+        // Get cursor position on screen
+        const coords = view.coordsAtPos(pos)
+        if (coords) {
+          tagAutocompletePosition.value = { x: coords.left, y: coords.bottom + 5 }
+        }
+        
+        console.log('[TagAutocomplete] Opening autocomplete at:', tagAutocompletePosition.value)
+        tagAutocompleteOpen.value = true
+        return true
+      }
+    }
+    
+    // Check if we're inside # ... and update query
+    if (tagAutocompleteOpen.value) {
+      // Find the # before cursor
+      let searchPos = pos - 1
+      let foundStart = false
+      
+      while (searchPos >= 0) {
+        const char = text[searchPos]
+        // Stop if we hit whitespace or newline
+        if (/\s/.test(char) || char === '\n') {
+          if (char === '#') {
+            foundStart = true
+            tagAutocompleteStartPos = searchPos + 1
+            break
+          }
+          tagAutocompleteOpen.value = false
+          return false
+        }
+        if (char === '#') {
+          foundStart = true
+          tagAutocompleteStartPos = searchPos + 1
+          break
+        }
+        searchPos--
+      }
+      
+      if (foundStart) {
+        tagAutocompleteQuery.value = text.substring(tagAutocompleteStartPos, pos)
+        return true
+      } else {
+        tagAutocompleteOpen.value = false
+      }
+    }
+    
+    return false
+  }
+
   // Handle keyboard events when autocomplete is open
   function handleKeyDown(key: string): boolean {
+    // Check tag autocomplete first
+    if (tagAutocompleteOpen.value) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(key)) {
+        switch (key) {
+          case 'ArrowDown':
+            tagAutocompleteSelectedIndex.value = Math.min(
+              tagAutocompleteSelectedIndex.value + 1,
+              tagAutocompleteSuggestions.value.length - 1
+            )
+            break
+          case 'ArrowUp':
+            tagAutocompleteSelectedIndex.value = Math.max(tagAutocompleteSelectedIndex.value - 1, -1)
+            break
+          case 'Enter':
+            if (tagAutocompleteSuggestions.value[tagAutocompleteSelectedIndex.value]) {
+              handleTagAutocompleteSelect(tagAutocompleteSuggestions.value[tagAutocompleteSelectedIndex.value])
+            }
+            break
+          case 'Escape':
+            tagAutocompleteOpen.value = false
+            break
+        }
+        return true
+      }
+    }
+    
+    // Then check wikilink autocomplete
     if (!autocompleteOpen.value) return false
     
     // Handle navigation keys when autocomplete is open
@@ -154,12 +271,46 @@
     autocompleteOpen.value = false
   }
 
+  function handleTagAutocompleteSelect(tag: string) {
+    if (!editorView) return
+    
+    const { state } = editorView
+    const pos = state.selection.main.head
+    
+    // Insert tag (replace query)
+    editorView.dispatch({
+      changes: {
+        from: tagAutocompleteStartPos,
+        to: pos,
+        insert: tag,
+      },
+      selection: { anchor: tagAutocompleteStartPos + tag.length },
+    })
+    
+    tagAutocompleteOpen.value = false
+  }
+
+  // Fetch available tags from API
+  async function fetchAvailableTags() {
+    try {
+      const tags = await window.api.tags.getAll()
+      availableTags.value = tags.map((t) => t.tag)
+      console.log('[TagAutocomplete] Fetched tags:', availableTags.value)
+    } catch (error) {
+      console.error('[MarkdownEditor] Failed to fetch tags:', error)
+      availableTags.value = []
+    }
+  }
+
   // Initialize CodeMirror
   onMounted(async () => {
     if (!editorContainer.value) return
 
     // Initialize note titles cache for wikilinks
     await updateNoteTitlesCache()
+    
+    // Fetch available tags
+    await fetchAvailableTags()
 
     const startState = EditorState.create({
       doc: props.modelValue,
@@ -169,6 +320,7 @@
         listContinuation(),
         markdownKeymap(),
         wikilinks(),
+        taskCheckbox(),
         keymap.of([
           {
             key: 'ArrowDown',
@@ -196,31 +348,34 @@
             console.log('[MarkdownEditor] Content changed, emitting update:modelValue:', newContent.substring(0, 50))
             emit('update:modelValue', newContent)
             
-            // Check for autocomplete trigger
+            // Check for autocomplete triggers
             detectWikilinkTrigger(update.view)
+            detectTagTrigger(update.view)
           }
         }),
         EditorView.theme({
           '&': {
             height: '100%',
-            fontSize: 'var(--font-size-md)',
+            fontSize: '15px',
             backgroundColor: 'transparent',
+            fontFamily: "'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           },
           '.cm-content': {
-            fontFamily: 'inherit',
-            padding: 'var(--space-lg)',
+            padding: 'var(--editor-padding, 48px)',
             caretColor: 'var(--color-text)',
             color: 'var(--color-text)',
+            maxWidth: 'var(--editor-max-width, 700px)',
+            margin: '0 auto',
           },
           '.cm-line': {
-            lineHeight: 'var(--line-height-relaxed)',
+            lineHeight: 'var(--editor-line-height, 1.6)',
           },
           '&.cm-focused': {
             outline: 'none',
           },
           '.cm-scroller': {
             overflow: 'auto',
-            fontFamily: 'inherit',
+            fontFamily: "'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           },
         }),
       ],
@@ -286,6 +441,14 @@
       :selected-index="autocompleteSelectedIndex"
       :suggestions="autocompleteSuggestions"
       @select="handleAutocompleteSelect"
+    />
+    <TagAutocomplete
+      :is-open="tagAutocompleteOpen"
+      :query="tagAutocompleteQuery"
+      :position="tagAutocompletePosition"
+      :selected-index="tagAutocompleteSelectedIndex"
+      :suggestions="tagAutocompleteSuggestions"
+      @select="handleTagAutocompleteSelect"
     />
   </div>
 </template>

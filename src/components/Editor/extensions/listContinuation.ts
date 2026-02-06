@@ -9,6 +9,35 @@ import { Prec } from '@codemirror/state'
  */
 
 /**
+ * Detects if a line is a task item
+ * Matches: "- [ ]", "- [x]", "- [>]", "- [-]" (with optional indentation)
+ */
+function detectTask(line: string): { isTask: boolean; status: string; indent: string; isEmpty: boolean } {
+  const match = line.match(/^(\s*)[-*+]\s+\[([ x>-])\]\s(.*)$/)
+  if (match) {
+    return {
+      isTask: true,
+      status: match[2],
+      indent: match[1],
+      isEmpty: match[3].trim() === '',
+    }
+  }
+  
+  // Check for empty task line (just marker + checkbox)
+  const emptyMatch = line.match(/^(\s*)[-*+]\s+\[([ x>-])\]\s*$/)
+  if (emptyMatch) {
+    return {
+      isTask: true,
+      status: emptyMatch[2],
+      indent: emptyMatch[1],
+      isEmpty: true,
+    }
+  }
+  
+  return { isTask: false, status: '', indent: '', isEmpty: false }
+}
+
+/**
  * Detects if a line is a bullet list item
  * Matches: "- ", "* ", "+ " (with optional indentation)
  * Also handles nested lists like "-   - Child" by extracting the full indentation
@@ -92,6 +121,29 @@ function handleEnter(view: EditorView): boolean {
   // Get current line
   const line = state.doc.lineAt(from)
   const lineText = line.text
+  
+  // Check for task first (tasks are a special case of bullet lists)
+  const taskInfo = detectTask(lineText)
+  if (taskInfo.isTask) {
+    if (taskInfo.isEmpty) {
+      // Empty task line: exit task list
+      // Remove the current line and the newline before it
+      const deleteFrom = line.from > 0 ? line.from - 1 : line.from
+      const deleteTo = from  // Delete up to cursor position
+      view.dispatch({
+        changes: { from: deleteFrom, to: deleteTo, insert: '' },
+        selection: { anchor: deleteFrom },
+      })
+    } else {
+      // Continue task list with new pending task
+      const newLine = `\n${taskInfo.indent}- [ ] `
+      view.dispatch({
+        changes: { from, insert: newLine },
+        selection: { anchor: from + newLine.length },
+      })
+    }
+    return true
+  }
   
   // Check for bullet list
   const bulletInfo = detectBulletList(lineText)

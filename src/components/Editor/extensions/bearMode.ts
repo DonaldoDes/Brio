@@ -19,25 +19,32 @@ const bearTheme = EditorView.baseTheme({
     fontStyle: 'italic',
   },
   '.cm-bear-code': {
-    fontFamily: 'monospace',
+    fontFamily: 'var(--code-font-family)',
     backgroundColor: 'rgba(128, 128, 128, 0.1)',
     padding: '2px 4px',
     borderRadius: '3px',
   },
   '.cm-bear-heading-1': {
-    fontSize: '2em',
-    fontWeight: 'bold',
-    lineHeight: '1.2',
+    fontSize: '32px',
+    fontWeight: '700',
+    marginBottom: '16px',
   },
   '.cm-bear-heading-2': {
-    fontSize: '1.5em',
+    fontSize: '24px',
+    fontWeight: '700',
+  },
+  '.cm-bear-heading-3': {
+    fontSize: '18px',
     fontWeight: 'bold',
     lineHeight: '1.3',
   },
-  '.cm-bear-heading-3': {
-    fontSize: '1.25em',
+  '.cm-bear-heading-4': {
+    fontSize: '16px',
     fontWeight: 'bold',
-    lineHeight: '1.4',
+  },
+  '.cm-bear-heading-mark': {
+    opacity: '0.3',
+    fontSize: '0.7em',
   },
   '.cm-bear-link': {
     color: '#0066cc',
@@ -45,12 +52,22 @@ const bearTheme = EditorView.baseTheme({
     cursor: 'pointer',
   },
   '.cm-bear-code-block': {
-    fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+    fontFamily: 'var(--code-font-family)',
     backgroundColor: 'rgba(128, 128, 128, 0.15)',
     padding: '8px 12px',
     borderRadius: '4px',
     display: 'block',
     margin: '4px 0',
+  },
+  // Orange bullet points for lists
+  '.cm-content ul': {
+    listStyleType: 'disc',
+  },
+  '.cm-content ul li::marker': {
+    color: '#FF9500',
+  },
+  '.cm-content ol li::marker': {
+    color: '#FF9500',
   },
 })
 
@@ -63,6 +80,8 @@ const codeMark = Decoration.mark({ class: 'cm-bear-code' })
 const heading1Mark = Decoration.mark({ class: 'cm-bear-heading-1' })
 const heading2Mark = Decoration.mark({ class: 'cm-bear-heading-2' })
 const heading3Mark = Decoration.mark({ class: 'cm-bear-heading-3' })
+const heading4Mark = Decoration.mark({ class: 'cm-bear-heading-4' })
+const headerMarkMuted = Decoration.mark({ class: 'cm-bear-heading-mark' })
 const linkMark = Decoration.mark({ class: 'cm-bear-link' })
 const codeBlockMark = Decoration.mark({ class: 'cm-bear-code-block' })
 
@@ -174,21 +193,22 @@ function findMarkdownElements(state: EditorState): MarkdownElement[] {
       })
     }
     
-    // Headings: # Title
-    const headingRegex = /^(#{1,3})\s+(.+)$/
+    // Headings: # Title (support H1-H6)
+    const headingRegex = /^(#{1,6})\s+(.+)$/
     match = headingRegex.exec(text)
     if (match) {
       const level = match[1].length
       const from = lineStart
       const to = lineStart + text.length
-      const markerEnd = from + match[1].length + 1 // Include space
+      const markerEnd = from + match[1].length // Just the # characters, not the space
+      const contentStart = markerEnd + 1 // Skip the space after #
       elements.push({
         type: 'heading',
         from,
         to,
         markerStart: from,
         markerEnd,
-        contentStart: markerEnd,
+        contentStart,
         contentEnd: to,
         level,
       })
@@ -286,15 +306,30 @@ function buildDecorations(view: EditorView): DecorationSet {
         break
 
       case 'heading':
-        // Style the content only (not the marker)
+        // Style the content (the heading text)
         if (element.contentStart !== undefined && element.contentEnd !== undefined) {
-          const headingMark =
-            element.level === 1 ? heading1Mark : element.level === 2 ? heading2Mark : heading3Mark
+          let headingMark
+          switch (element.level) {
+            case 1:
+              headingMark = heading1Mark
+              break
+            case 2:
+              headingMark = heading2Mark
+              break
+            case 3:
+              headingMark = heading3Mark
+              break
+            case 4:
+              headingMark = heading4Mark
+              break
+            default:
+              headingMark = heading4Mark // H5, H6 use same style as H4
+          }
           decorations.push(headingMark.range(element.contentStart, element.contentEnd))
         }
-        // Hide the # marker
+        // Mute the # markers (make them visible but grayed out)
         if (element.markerStart !== undefined && element.markerEnd !== undefined) {
-          decorations.push(hiddenMark.range(element.markerStart, element.markerEnd))
+          decorations.push(headerMarkMuted.range(element.markerStart, element.markerEnd))
         }
         break
 
