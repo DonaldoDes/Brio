@@ -20,6 +20,9 @@ const api: BrioAPI = {
     update: (id: string, title: string, slug: string, content: string | null) =>
       ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE, id, title, slug, content),
 
+    updateType: (id: string, type: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES.UPDATE_TYPE, id, type),
+
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.DELETE, id),
 
     search: (query: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES.SEARCH, query),
@@ -57,6 +60,28 @@ const api: BrioAPI = {
   },
   window: {
     openNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW.OPEN_NOTE, noteId),
+  },
+  tags: {
+    getAll: () => ipcRenderer.invoke(IPC_CHANNELS.TAGS.GET_ALL),
+
+    getByNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.TAGS.GET_BY_NOTE, noteId),
+
+    getNotesByTag: (tag: string) => ipcRenderer.invoke(IPC_CHANNELS.TAGS.GET_NOTES_BY_TAG, tag),
+  },
+  tasks: {
+    getAll: () => ipcRenderer.invoke(IPC_CHANNELS.TASKS.GET_ALL),
+
+    getByNote: (noteId: string) => ipcRenderer.invoke(IPC_CHANNELS.TASKS.GET_BY_NOTE, noteId),
+
+    getByStatus: (status: string) => ipcRenderer.invoke(IPC_CHANNELS.TASKS.GET_BY_STATUS, status),
+  },
+  quickCapture: {
+    save: (content: string) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_CAPTURE.SAVE, content),
+
+    getHistory: () => ipcRenderer.invoke(IPC_CHANNELS.QUICK_CAPTURE.GET_HISTORY),
+  },
+  theme: {
+    getSystemTheme: () => ipcRenderer.invoke(IPC_CHANNELS.THEME.GET_SYSTEM_THEME),
   },
 }
 
