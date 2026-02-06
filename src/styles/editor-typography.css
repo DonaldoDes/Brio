@@ -1,0 +1,167 @@
+/**
+ * Editor Typography - Bear Design
+ * 
+ * Typography styles for markdown editor and preview
+ */
+
+/* Headings */
+.cm-editor h1,
+.markdown-body h1 {
+  font-size: var(--font-size-h1, 30px);
+  font-weight: 700;
+  margin: 40px 0 20px 0;
+  color: #1A1A1A;
+}
+
+:root[data-theme="dark"] .cm-editor h1,
+:root[data-theme="dark"] .markdown-body h1 {
+  color: #E5E5E7;
+}
+
+.cm-editor h2,
+.markdown-body h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 32px 0 16px 0;
+  color: #1A1A1A;
+}
+
+:root[data-theme="dark"] .cm-editor h2,
+:root[data-theme="dark"] .markdown-body h2 {
+  color: #E5E5E7;
+}
+
+.cm-editor h3,
+.markdown-body h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 24px 0 12px 0;
+  color: #1A1A1A;
+}
+
+:root[data-theme="dark"] .cm-editor h3,
+:root[data-theme="dark"] .markdown-body h3 {
+  color: #E5E5E7;
+}
+
+/* Lists */
+.cm-editor ul,
+.markdown-body ul {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.cm-editor li,
+.markdown-body li {
+  margin: 8px 0;
+}
+
+.cm-editor li::marker,
+.markdown-body li::marker {
+  color: #F59E0B;
+}
+
+/* Inline code */
+.cm-editor code:not(.cm-line),
+.markdown-body code:not(pre code) {
+  background: #F5F5F5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--code-font-family);
+  font-size: 14px;
+  color: #E53E3E;
+}
+
+:root[data-theme="dark"] .cm-editor code:not(.cm-line),
+:root[data-theme="dark"] .markdown-body code:not(pre code) {
+  background: #2C2C2E;
+  color: #FC8181;
+}
+
+/* Code blocks */
+.cm-editor pre,
+.markdown-body pre {
+  background: #F5F5F5;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  overflow-x: auto;
+  font-family: var(--code-font-family);
+}
+
+:root[data-theme="dark"] .cm-editor pre,
+:root[data-theme="dark"] .markdown-body pre {
+  background: #2C2C2E;
+}
+
+/* Links - POLISH-015 */
+.cm-editor a,
+.markdown-body a {
+  color: var(--color-accent, #E85B5B);
+  text-decoration: none;
+}
+
+.cm-editor a:hover,
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+/* Blockquotes - POLISH-015 */
+.cm-editor blockquote,
+.markdown-body blockquote {
+  border-left: 4px solid var(--color-accent, #E85B5B);
+  padding-left: 16px;
+  margin: 16px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.cm-editor hr,
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+/* Tables */
+.cm-editor table,
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.cm-editor th,
+.markdown-body th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+}
+
+.cm-editor td,
+.markdown-body td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+}
+
+/* Strong/Bold */
+.cm-editor strong,
+.markdown-body strong {
+  font-weight: 600;
+}
+
+/* Emphasis/Italic */
+.cm-editor em,
+.markdown-body em {
+  font-style: italic;
+}
+
+/* Strikethrough */
+.cm-editor del,
+.markdown-body del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}

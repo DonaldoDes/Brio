@@ -5,28 +5,63 @@
  */
 
 :root {
-  /* Colors - Background */
-  --color-bg: #1a1a1a;
-  --color-bg-secondary: #242424;
-  --color-bg-tertiary: #2a2a2a;
+  /* Theme Colors - Light (default) - Bear Design Reference */
+  --bg-primary: #FFFFFF;        /* Editor background */
+  --bg-secondary: #F7F7F7;      /* Note List background - POLISH-012 */
+  --bg-sidebar: #F2F2F7;        /* Sidebar background - POLISH-011 */
+  --bg-tertiary: #E5E5EA;       /* Tertiary elements */
+  --text-primary: #1D1D1F;      /* Primary text */
+  --text-secondary: #8E8E93;    /* Secondary text */
+  --text-muted: #AEAEB2;        /* Muted text (dates) */
+  --icon-color: #888888;        /* Icon color */
+  --icon-hover: #333333;        /* Icon hover color */
+  --border: #E5E5EA;            /* Separators */
+  --border-hover: #D1D1D6;
+  
+  /* Bear Redesign - Note List specific */
+  --note-list-bg: #FFFFFF;
+  --note-list-border: #E0E0E0;
+  --note-item-border: #F0F0F0;
+  --note-item-hover: #F9F9F9;
+  --note-item-selected: #E3E9F0;
+  --note-title-color: #333333;
+  --note-preview-color: #666666;
+  --note-date-color: #999999;
+  --search-input-bg: #F0F0F0;
+  
+  /* Filter chips */
+  --chip-bg: #F0F0F0;
+  --chip-text: #555555;
 
-  /* Colors - Text */
-  --color-text: #e5e5e5;
-  --color-text-secondary: #a0a0a0;
-  --color-text-muted: #666666;
+  /* Colors - Background (legacy, mapped to theme) */
+  --color-bg: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-bg-hover: var(--bg-tertiary);
 
-  /* Colors - Accent (Brio brand color) */
-  --color-accent: #e85d4c;
-  --color-accent-hover: #ff6b58;
+  /* Colors - Text (legacy, mapped to theme) */
+  --color-text: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Colors - Accent (Bear red) - POLISH-015 */
+  --color-accent: #E85B5B;
+  --color-accent-hover: #F07070;
+  --color-primary: #E85B5B;
+  --color-primary-bg: rgba(232, 91, 91, 0.1);
 
   /* Colors - Semantic */
   --color-success: #44ff44;
   --color-warning: #fbbf24;
   --color-error: #ff4444;
 
-  /* Colors - Border */
-  --color-border: #333333;
-  --color-border-hover: #444444;
+  /* Colors - Border (legacy, mapped to theme) */
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  
+  /* Checkbox Border - Accessible contrast in dark mode */
+  --checkbox-border: var(--border);
+  --checkbox-border-hover: var(--border-hover);
 
   /* Spacing */
   --space-xs: 4px;
@@ -39,10 +74,12 @@
   /* Typography - Size */
   --font-size-xs: 11px;
   --font-size-sm: 12px;
+  --font-size-13: 13px;
   --font-size-md: 14px;
   --font-size-lg: 16px;
   --font-size-xl: 18px;
   --font-size-2xl: 24px;
+  --font-size-h1: 30px;         /* H1 heading size - POLISH-020 */
 
   /* Typography - Weight */
   --font-weight-normal: 400;
@@ -57,23 +94,127 @@
 
   /* Border Radius */
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 350ms ease;
+  --transition-fast: 100ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
 
   /* Z-Index */
   --z-dropdown: 100;
   --z-modal: 200;
   --z-tooltip: 300;
   --z-toast: 400;
+
+  /* UI Font (Avenir Next with fallback) - POLISH-014 */
+  --ui-font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  
+  /* Editor Font (customizable) */
+  --editor-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --editor-font-size: 16px;
+  --editor-line-height: 1.6;
+  --editor-padding: 48px;
+  --editor-max-width: 700px;
+  
+  /* Code blocks font (monospace) */
+  --code-font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+}
+
+/* Dark Theme - Bear Design Reference */
+:root[data-theme="dark"] {
+  --bg-primary: #1C1C1E;        /* Editor background */
+  --bg-secondary: #1C1C1E;      /* Note List background */
+  --bg-sidebar: #0D0D0D;        /* Sidebar background */
+  --bg-tertiary: #2C2C2E;       /* Tertiary elements */
+  --text-primary: #E5E5E7;      /* Primary text */
+  --text-secondary: #8E8E93;    /* Secondary text */
+  --text-muted: #636366;        /* Muted text (dates) */
+  --icon-color: #8E8E93;        /* Icon color */
+  --icon-hover: #E5E5E7;        /* Icon hover color */
+  --border: #38383A;            /* Separators */
+  --border-hover: #48484A;
+  
+  /* Checkbox Border - WCAG 3:1 contrast ratio */
+  --checkbox-border: #777777;
+  --checkbox-border-hover: #888888;
+  
+  /* Bear Redesign - Note List specific (dark) */
+  --note-list-bg: #1C1C1E;
+  --note-list-border: #3A3A3C;
+  --note-item-border: #2C2C2E;
+  --note-item-hover: #2C2C2E;
+  --note-item-selected: #3A3A3C;
+  --note-title-color: #E5E5E7;
+  --note-preview-color: #8E8E93;
+  --note-date-color: #636366;
+  --search-input-bg: #2C2C2E;
+  
+  /* Filter chips (dark) */
+  --chip-bg: #3A3A3C;
+  --chip-text: #E5E5E7;
+}
+
+/* Light Theme (explicit) - Bear Design Reference */
+:root[data-theme="light"] {
+  --bg-primary: #FFFFFF;        /* Editor background */
+  --bg-secondary: #F7F7F7;      /* Note List background - POLISH-012 */
+  --bg-sidebar: #F2F2F7;        /* Sidebar background - POLISH-011 */
+  --bg-tertiary: #E5E5EA;       /* Tertiary elements */
+  --text-primary: #1D1D1F;      /* Primary text */
+  --text-secondary: #8E8E93;    /* Secondary text */
+  --text-muted: #AEAEB2;        /* Muted text (dates) */
+  --icon-color: #888888;        /* Icon color */
+  --border: #E5E5EA;            /* Separators */
+  --border-hover: #D1D1D6;
+}
+
+/* Dark Mode Transitions (POLISH-008) */
+body,
+.sidebar,
+.notes-list,
+.note-list-item,
+.editor-panel,
+.backlinks-panel,
+.cm-editor,
+.cm-scroller,
+.cm-content {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CCCCCC;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999999;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3A3A3C;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #48484A;
 }
