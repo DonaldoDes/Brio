@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, Menu, globalShortcut } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -8,6 +8,10 @@ import { PGliteDB } from './database'
 import { registerNotesHandlers, cleanupIPC } from './ipc/handlers/notes'
 import { registerLinksHandlers, cleanupLinksIPC } from './ipc/handlers/links'
 import { registerWindowHandlers, cleanupWindowIPC } from './ipc/handlers/window'
+import { registerTagsHandlers, cleanupTagsIPC } from './ipc/handlers/tags'
+import { registerTasksHandlers, cleanupTasksIPC } from './ipc/handlers/tasks'
+import { registerQuickCaptureHandlers, cleanupQuickCaptureIPC } from './ipc/handlers/quickCapture'
+import { registerThemeHandlers, cleanupThemeIPC } from './ipc/handlers/theme'
 
 const _require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -110,20 +114,45 @@ void app.whenReady().then(async () => {
   registerNotesHandlers(db)
   registerLinksHandlers(db)
   registerWindowHandlers()
+  registerTagsHandlers(db)
+  registerTasksHandlers(db)
+  registerQuickCaptureHandlers(db)
+  registerThemeHandlers()
   console.log('[Main] IPC handlers registered')
 
   // Create main window
   await createWindow()
   console.log('[Main] Window created')
+
+  // Register global shortcut for quick capture (Cmd+Shift+N)
+  const ret = globalShortcut.register('CommandOrControl+Shift+N', () => {
+    console.log('[Main] Quick capture shortcut triggered')
+    if (win) {
+      win.webContents.send('quick-capture:toggle')
+    }
+  })
+
+  if (!ret) {
+    console.error('[Main] Failed to register quick capture shortcut')
+  } else {
+    console.log('[Main] Quick capture shortcut registered')
+  }
 })
 
 app.on('window-all-closed', () => {
   win = null
 
+  // Unregister global shortcuts
+  globalShortcut.unregisterAll()
+
   // Cleanup IPC handlers and close database
   cleanupIPC()
   cleanupLinksIPC()
   cleanupWindowIPC()
+  cleanupTagsIPC()
+  cleanupTasksIPC()
+  cleanupQuickCaptureIPC()
+  cleanupThemeIPC()
   if (db) {
     void db.close().then(() => {
       db = null
